@@ -1,5 +1,7 @@
 # 从 IRL 到 RLHF，再到 RLVR：LLM 后训练到底在学什么奖励？
 
+> The reward is not the point; the point is where the reward points.
+
 如果只看算法名字，今天的大模型后训练很容易被讲成一串缩写：RLHF、RLAIF、PPO、GRPO、DPO、RLVR、PRM。它们看起来像是同一件事的不同版本：都在用某种 RL 方法让模型变好。
 
 但这个理解其实不够准确。更关键的问题不是“用了哪个优化器”，而是：
