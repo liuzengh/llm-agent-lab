@@ -23,8 +23,6 @@ theme:
     - navigation.tabs
     - search.suggest
     - search.share
-    - content.action.edit
-    - content.action.view
   icon:
     repo: fontawesome/brands/github
   palette:
