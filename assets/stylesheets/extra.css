@@ -1,5 +1,5 @@
 .md-grid {
-    max-width: 1200px;
+    max-width: min(1600px, calc(100% - 48px));
 }
 
 .md-typeset {
@@ -9,4 +9,15 @@
 .md-tabs__list {
     display: flex;
     justify-content: center;
+}
+
+@media screen and (min-width: 1220px) {
+    .md-content {
+        max-width: 980px;
+    }
+
+    .md-content__inner {
+        margin-left: 1.6rem;
+        margin-right: 1.6rem;
+    }
 }
