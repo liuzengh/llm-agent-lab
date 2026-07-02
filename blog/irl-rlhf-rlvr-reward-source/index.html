@@ -1,0 +1,1197 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Notes and practice on AI, LLM, agent systems, and post-training.">
+      
+      
+      
+        <link rel="canonical" href="https://liuzengh.github.io/llm-agent-lab/blog/irl-rlhf-rlvr-reward-source/">
+      
+      
+        <link rel="prev" href="../..">
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.17">
+    
+    
+      
+        <title>从 IRL 到 RLHF，再到 RLVR：LLM 后训练到底在学什么奖励？ - LLM Agent Lab</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.7e37652d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#irl-rlhf-rlvrllm" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../.." title="LLM Agent Lab" class="md-header__button md-logo" aria-label="LLM Agent Lab" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LLM Agent Lab
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              从 IRL 到 RLHF，再到 RLVR：LLM 后训练到底在学什么奖励？
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="分享" aria-label="分享" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/liuzengh/llm-agent-lab" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    liuzengh/llm-agent-lab
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  首页
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Blog
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LLM Agent Lab" class="md-nav__button md-logo" aria-label="LLM Agent Lab" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LLM Agent Lab
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/liuzengh/llm-agent-lab" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    liuzengh/llm-agent-lab
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    首页
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Blog
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Blog
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    从 IRL 到 RLHF，再到 RLVR：LLM 后训练到底在学什么奖励？
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    从 IRL 到 RLHF，再到 RLVR：LLM 后训练到底在学什么奖励？
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-llm" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. 先看 LLM 的整体训练链路
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-rl-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. RL 是什么：从反馈中学习 policy
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-irl-reward" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. IRL：当 reward 写不出来时，从行为中反推
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-rlhfreward-model-irl-reward-learning" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. RLHF：Reward Model 是 IRL 风格的 reward learning
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-ppogrpo-reward" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. PPO、GRPO 解决的是优化，不是 reward 来源
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-dpo-reward-model-reward" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. DPO：没有显式 Reward Model，也仍然有隐含 reward
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-rlvrthinking-reward-irl" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. RLVR：thinking 模型常用的是可验证 reward，不是 IRL
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-prm-reward-learning" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. PRM：过程奖励又把问题带回 reward learning
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. 一张表看清几条路线
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. 几个知名模型怎么放进这张图
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-llm-reward-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      11. 结论：LLM 后训练的分水岭是 reward source
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      参考
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-llm" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. 先看 LLM 的整体训练链路
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-rl-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. RL 是什么：从反馈中学习 policy
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-irl-reward" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. IRL：当 reward 写不出来时，从行为中反推
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-rlhfreward-model-irl-reward-learning" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. RLHF：Reward Model 是 IRL 风格的 reward learning
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-ppogrpo-reward" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. PPO、GRPO 解决的是优化，不是 reward 来源
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-dpo-reward-model-reward" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. DPO：没有显式 Reward Model，也仍然有隐含 reward
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-rlvrthinking-reward-irl" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. RLVR：thinking 模型常用的是可验证 reward，不是 IRL
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-prm-reward-learning" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. PRM：过程奖励又把问题带回 reward learning
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. 一张表看清几条路线
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. 几个知名模型怎么放进这张图
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-llm-reward-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      11. 结论：LLM 后训练的分水岭是 reward source
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      参考
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/liuzengh/llm-agent-lab/edit/main/docs/mkdocs/blog/irl-rlhf-rlvr-reward-source.md" title="编辑此页" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+    
+      
+    
+    <a href="https://github.com/liuzengh/llm-agent-lab/raw/main/docs/mkdocs/blog/irl-rlhf-rlvr-reward-source.md" title="查看本页的源代码" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.2 8.2 0 0 1-1.23-2"/></svg>
+    </a>
+  
+
+
+<h1 id="irl-rlhf-rlvrllm">从 IRL 到 RLHF，再到 RLVR：LLM 后训练到底在学什么奖励？</h1>
+<p>如果只看算法名字，今天的大模型后训练很容易被讲成一串缩写：RLHF、RLAIF、PPO、GRPO、DPO、RLVR、PRM。它们看起来像是同一件事的不同版本：都在用某种 RL 方法让模型变好。</p>
+<p>但这个理解其实不够准确。更关键的问题不是“用了哪个优化器”，而是：</p>
+<blockquote>
+<p>reward 从哪里来？</p>
+</blockquote>
+<p>要回答这个问题，需要先把 RL 放回 LLM 的整体训练链路里看。一个聊天模型不是一开始就通过 RL 训练出来的；通常是先通过大规模预训练获得语言、知识和泛化能力，再通过后训练把它变成更愿意听指令、更安全、更擅长推理的 assistant。RL 主要出现在这个后训练阶段。</p>
+<p>如果 reward 已经可以被明确写出来，RL 要解决的是如何在这个 reward 下优化 policy。如果 reward 写不出来，只能从人类行为、偏好或专家示范中反推，那么问题就带有 Inverse Reinforcement Learning（IRL）的味道。这个视角能把传统 RL、IRL、RLHF、DPO，以及 reasoning / thinking 模型中的 RLVR 放到同一张图里。</p>
+<p>这是一条很值得抓住的线索：LLM RL 并不是凭空出现的新范式，它延续了经典 RL 里“reward 如何获得”的老问题，只是这个问题在语言模型里变得更抽象，也更重要。</p>
+<h2 id="1-llm">1. 先看 LLM 的整体训练链路</h2>
+<p>现代 LLM 的训练可以粗略分成三层：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1">1</a></span>
+<span class="normal"><a href="#__codelineno-0-2">2</a></span>
+<span class="normal"><a href="#__codelineno-0-3">3</a></span>
+<span class="normal"><a href="#__codelineno-0-4">4</a></span>
+<span class="normal"><a href="#__codelineno-0-5">5</a></span>
+<span class="normal"><a href="#__codelineno-0-6">6</a></span>
+<span class="normal"><a href="#__codelineno-0-7">7</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a>Pretraining
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2"></a>    ↓
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3"></a>Instruction tuning / SFT
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4"></a>    ↓
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5"></a>Post-training for alignment and reasoning
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6"></a>    ├─ Preference alignment: RLHF / RLAIF / DPO
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7"></a>    └─ Reasoning training: RLVR / rule-based RL / verifier-based RL
+</span></code></pre></div></td></tr></table></div>
+<p>第一层是 pretraining。模型在海量文本、代码和多模态数据上做 next-token prediction，学会语言模式、世界知识、代码结构和基本推理能力。这个阶段训练出来的是 base model，它会续写文本，但不一定稳定地遵循用户意图。</p>
+<p>第二层是 instruction tuning 或 supervised fine-tuning（SFT）。模型用人工写好的指令-回答数据、合成数据或高质量对话数据继续训练，学会“用户问问题，我给出回答”的基本交互格式。很多开源 chat model 到这一步已经可以使用。</p>
+<p>第三层才是本文关注的 post-training。后训练不是为了让模型重新学习所有知识，而是为了调整行为分布：什么回答更有帮助，什么回答更安全，遇到数学题要不要多想几步，代码能不能通过测试，工具调用是否完成任务。RL 在 LLM 里的作用主要就出现在这里：它把“反馈信号”转成对 policy 的更新。</p>
+<p>所以，RL 不是整个 LLM 训练流程的起点，而是后训练工具箱里的一类方法。理解它之前，我们先从最基础的 RL 定义开始。</p>
+<h2 id="2-rl-policy">2. RL 是什么：从反馈中学习 policy</h2>
+<p>Reinforcement Learning（强化学习）研究的是这样一类问题：一个 agent 在环境中行动，环境给它反馈，agent 根据反馈调整自己的行为策略，让未来获得的累计 reward 更高。</p>
+<p>最小化地说，RL 包含四个对象：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-1-1">1</a></span>
+<span class="normal"><a href="#__codelineno-1-2">2</a></span>
+<span class="normal"><a href="#__codelineno-1-3">3</a></span>
+<span class="normal"><a href="#__codelineno-1-4">4</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1"></a>state:  当前处境
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2"></a>action: agent 可以采取的动作
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3"></a>reward: 环境给出的反馈
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4"></a>policy: agent 选择动作的策略
+</span></code></pre></div></td></tr></table></div>
+<p>更正式的 MDP（Markov Decision Process）只是把这些对象写成数学形式；理解本文不需要一上来进入完整 MDP。对 LLM 来说，可以先用一个近似类比：</p>
+<ul>
+<li>state 约等于 prompt 或 conversation context，也就是模型当前看到的上下文。</li>
+<li>action 约等于 completion 或 token sequence，也就是模型接下来生成的内容。</li>
+<li>reward 约等于人类偏好分数、Reward Model 分数，或者测试是否通过。</li>
+<li>policy 约等于当前语言模型 <span class="arithmatex">\(\pi_\theta\)</span>，也就是“在给定上下文下，模型会生成什么”的概率分布，其中 <span class="arithmatex">\(\theta\)</span> 表示模型参数。</li>
+</ul>
+<p>于是标准 RL 的设定是：</p>
+<div class="arithmatex">\[
+\pi^\star = \arg\max_\pi \; \mathbb{E}_{\pi}\left[\sum_{t=0}^{T} \gamma^t R(s_t,a_t)\right]
+\]</div>
+<p>也就是说，RL 要找到一个策略 <span class="arithmatex">\(\pi^\star\)</span>，让未来累计 reward 的期望尽可能高。这里的 <span class="arithmatex">\(s_t\)</span> 是时刻 <span class="arithmatex">\(t\)</span> 的 state，<span class="arithmatex">\(a_t\)</span> 是时刻 <span class="arithmatex">\(t\)</span> 的 action，<span class="arithmatex">\(R(s_t,a_t)\)</span> 表示在状态 <span class="arithmatex">\(s_t\)</span> 下采取动作 <span class="arithmatex">\(a_t\)</span> 会得到多少奖励；<span class="arithmatex">\(\pi(a \mid s)\)</span> 表示 agent 在状态 <span class="arithmatex">\(s\)</span> 下选择动作 <span class="arithmatex">\(a\)</span> 的概率，其中 <span class="arithmatex">\(\pi\)</span> 是强化学习里常用来表示 policy 的符号；<span class="arithmatex">\(\mathbb{E}_{\pi}\)</span> 表示期望来自当前策略 <span class="arithmatex">\(\pi\)</span> 采样出的行为；<span class="arithmatex">\(\gamma\)</span> 是折扣因子，用来降低较远未来 reward 的权重；<span class="arithmatex">\(T\)</span> 是时间范围或任务结束步数。</p>
+<p>在这个设定下，奖励函数已经给定，算法的任务是找到一个策略，让长期累计奖励尽可能高。</p>
+<p>例如机器人走路，可以粗略地规定：前进一步给 <span class="arithmatex">\(+1\)</span>，摔倒给 <span class="arithmatex">\(-100\)</span>，能耗过高时扣除一个与能耗相关的惩罚项，比如 <span class="arithmatex">\(-\lambda \cdot \text{energy}\)</span>，其中 <span class="arithmatex">\(\lambda\)</span> 控制能耗惩罚的强度。</p>
+<p>代码生成任务里，也可以把 reward 直接绑定到测试：</p>
+<p>如果单元测试通过，reward 是 <span class="arithmatex">\(1\)</span>；如果失败，reward 是 <span class="arithmatex">\(0\)</span>。</p>
+<p>在这些问题里，RL 的核心难点是优化：怎么采样，怎么估计梯度，怎么降低方差，怎么避免 policy 更新过猛。PPO、REINFORCE、GRPO 这类方法都可以被放在这个层面理解。它们关心的是：在已有 reward 下，怎样更稳定、更高效地更新 policy。</p>
+<p>但很多真实任务最大的困难并不在这里，而在 reward 本身。</p>
+<p>什么叫“回答有帮助”？什么叫“诚实”？什么叫“安全”？什么叫“推理过程更好”？这些目标通常无法像“测试是否通过”那样写成一个清晰的函数。于是问题反过来了：我们不是先有 reward 再优化 policy，而是要先问，reward 到底是什么。</p>
+<h2 id="3-irl-reward">3. IRL：当 reward 写不出来时，从行为中反推</h2>
+<p>Inverse Reinforcement Learning 解决的正是这个反方向问题。</p>
+<p>传统 RL 是：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-2-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1"></a>Reward → Policy
+</span></code></pre></div></td></tr></table></div>
+<p>IRL 则是：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-3-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1"></a>Expert demonstrations → Reward
+</span></code></pre></div></td></tr></table></div>
+<p>它的基本假设是：专家的行为不是随机的，而是在某个隐含奖励函数下近似最优。我们观察专家怎么做，然后尝试推断：如果专家这样行动，那么他背后可能在优化什么 reward？</p>
+<p>比如自动驾驶里，人类司机会避开行人、保持车道、平稳刹车、尽量快速到达目的地。我们未必能手工写出一个完整 reward，但可以从大量驾驶示范里反推：哪些轨迹更像“好驾驶”，哪些轨迹明显不合理。</p>
+<p>经典 maximum entropy IRL 可以从 maximum likelihood 的角度理解：给定专家轨迹，希望这些轨迹在当前 reward 下看起来更可能、更“optimal”。下面这个公式不是理解全文必须掌握的细节，它只是说明 IRL 如何把 reward 和行为概率联系起来：在 maximum entropy / control-as-inference 的框架下，一个状态-动作对被视为 optimal 的概率与 reward 的指数相关。</p>
+<div class="arithmatex">\[
+p(O_t \mid s_t, a_t) \propto \exp\left(r_\psi(s_t, a_t)\right)
+\]</div>
+<p>这个式子表示：在状态 <span class="arithmatex">\(s_t\)</span> 下采取动作 <span class="arithmatex">\(a_t\)</span> 的 reward 越高，这个行为越容易被解释为“optimal”。其中，<span class="arithmatex">\(O_t\)</span> 表示时刻 <span class="arithmatex">\(t\)</span> 的 optimality 事件，<span class="arithmatex">\(s_t\)</span> 是状态，<span class="arithmatex">\(a_t\)</span> 是动作，<span class="arithmatex">\(r_\psi\)</span> 是带参数 <span class="arithmatex">\(\psi\)</span> 的 reward function，<span class="arithmatex">\(\propto\)</span> 表示“正比于”，<span class="arithmatex">\(\exp(\cdot)\)</span> 表示指数函数。</p>
+<p>直觉上，这表示 reward 越高的行为，越可能被解释为“专家会做的行为”。学习 reward 时，一方面要提高专家轨迹的 reward，另一方面也要和当前 policy 采样出的轨迹做对比。于是 IRL 看起来像一个交替过程：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-4-1">1</a></span>
+<span class="normal"><a href="#__codelineno-4-2">2</a></span>
+<span class="normal"><a href="#__codelineno-4-3">3</a></span>
+<span class="normal"><a href="#__codelineno-4-4">4</a></span>
+<span class="normal"><a href="#__codelineno-4-5">5</a></span>
+<span class="normal"><a href="#__codelineno-4-6">6</a></span>
+<span class="normal"><a href="#__codelineno-4-7">7</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1"></a>用当前 reward 优化 policy
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2"></a>        ↓
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3"></a>采样 policy 的轨迹
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4"></a>        ↓
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5"></a>让专家轨迹比 policy 轨迹更像 optimal
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6"></a>        ↓
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7"></a>更新 reward
+</span></code></pre></div></td></tr></table></div>
+<p>这个结构很重要，因为它已经暗示了后来的 RLHF：先学习一个 reward，再用 RL 优化模型。</p>
+<h2 id="4-rlhfreward-model-irl-reward-learning">4. RLHF：Reward Model 是 IRL 风格的 reward learning</h2>
+<p>来到 LLM，状态可以近似理解为 prompt，动作可以理解为 completion。模型 <span class="arithmatex">\(\pi_\theta\)</span> 接收一个 prompt <span class="arithmatex">\(s\)</span>，生成一个回答 <span class="arithmatex">\(a\)</span>，然后得到某个 reward <span class="arithmatex">\(r(s,a)\)</span>。这里的 <span class="arithmatex">\(r(s,a)\)</span> 表示“对于 prompt <span class="arithmatex">\(s\)</span> 和回答 <span class="arithmatex">\(a\)</span>，系统给出的奖励分数”。为了和前面传统 RL 里的环境 reward <span class="arithmatex">\(R(s,a)\)</span> 区分，后面会用小写 <span class="arithmatex">\(r\)</span> 表示 LLM 后训练里的 reward score。</p>
+<p>问题是，对于聊天助手来说，<span class="arithmatex">\(r(s,a)\)</span> 通常无法手工定义。</p>
+<p>用户问“帮我写一封拒绝合作的邮件”，什么回答最好？正式一点还是温和一点？短一点还是解释充分一点？这些都不是单一 ground truth 能决定的。于是 RLHF 采用了人类偏好数据：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-5-1">1</a></span>
+<span class="normal"><a href="#__codelineno-5-2">2</a></span>
+<span class="normal"><a href="#__codelineno-5-3">3</a></span>
+<span class="normal"><a href="#__codelineno-5-4">4</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1"></a>Prompt
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2"></a>  ├─ Answer A
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3"></a>  └─ Answer B
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4"></a>Human: A is better than B
+</span></code></pre></div></td></tr></table></div>
+<p>然后用这些偏好训练 Reward Model。这个 Reward Model 可以写成 <span class="arithmatex">\(r_\psi(s,a)\)</span>，其中 <span class="arithmatex">\(s\)</span> 是 prompt，<span class="arithmatex">\(a\)</span> 是回答，<span class="arithmatex">\(\psi\)</span> 是 Reward Model 的参数。也就是说，带参数的 <span class="arithmatex">\(r_\psi\)</span> 表示需要从偏好数据中学习出来的 reward function。训练好 Reward Model 之后，再用 PPO、REINFORCE 或 GRPO 这类 RL 算法去更新语言模型策略 <span class="arithmatex">\(\pi_\theta\)</span>。</p>
+<p>偏好学习里常用 Bradley-Terry model 来表达比较数据。这里沿用 IRL 里的记号 <span class="arithmatex">\(\tau\)</span>：在传统 RL 里它通常表示一条轨迹，在 LLM 场景里，一个 completion 也可以被看成 token 序列形成的一条短轨迹。若人类偏好轨迹或回答 <span class="arithmatex">\(\tau_i\)</span> 胜过 <span class="arithmatex">\(\tau_j\)</span>，则：</p>
+<div class="arithmatex">\[
+p(\tau_i \succ \tau_j) = \sigma\left(r_\psi(\tau_i) - r_\psi(\tau_j)\right)
+\]</div>
+<p>这个式子表示：人类选择 <span class="arithmatex">\(\tau_i\)</span> 而不是 <span class="arithmatex">\(\tau_j\)</span> 的概率，取决于二者的 reward difference。其中，<span class="arithmatex">\(\tau_i\)</span> 和 <span class="arithmatex">\(\tau_j\)</span> 表示两个候选回答或轨迹，<span class="arithmatex">\(\succ\)</span> 表示“偏好前者胜过后者”，<span class="arithmatex">\(r_\psi(\tau)\)</span> 是 Reward Model 给轨迹 <span class="arithmatex">\(\tau\)</span> 的分数，<span class="arithmatex">\(\sigma(\cdot)\)</span> 是 sigmoid 函数，用来把 reward difference 转成 <span class="arithmatex">\(0\)</span> 到 <span class="arithmatex">\(1\)</span> 之间的概率。训练 Reward Model 就是在最大化人类偏好数据的似然，让被人类选中的回答获得更高 reward。</p>
+<p>这一步就是 RLHF 和 IRL 最接近的地方。程序员没有直接写出“有帮助、诚实、安全”的 reward，而是通过人类比较数据反推出一个 reward function。它不一定是经典 IRL 的完整形式，但在问题结构上非常相似：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-6-1">1</a></span>
+<span class="normal"><a href="#__codelineno-6-2">2</a></span>
+<span class="normal"><a href="#__codelineno-6-3">3</a></span>
+<span class="normal"><a href="#__codelineno-6-4">4</a></span>
+<span class="normal"><a href="#__codelineno-6-5">5</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1"></a>Human behavior / preference
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2"></a>        ↓
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3"></a>Learn reward
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4"></a>        ↓
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5"></a>Optimize policy
+</span></code></pre></div></td></tr></table></div>
+<p>因此，更精确的说法不是“所有 LLM Alignment 本质上都是 IRL”，而是：</p>
+<blockquote>
+<p>RLHF / preference alignment 可以被看作一种 IRL 风格的 reward learning：它从人类偏好中学习隐含 reward，再用 RL 优化语言模型策略。</p>
+</blockquote>
+<p>这个说法保留了 IRL 的核心洞察，也避免把所有 LLM 后训练都粗暴归为 IRL。</p>
+<h2 id="5-ppogrpo-reward">5. PPO、GRPO 解决的是优化，不是 reward 来源</h2>
+<p>RLHF 里常常提到 PPO，所以很多人会把 RLHF 理解成“用 PPO 训练大模型”。但从 reward-source 的视角看，PPO 只是第二阶段的优化方法。</p>
+<p>一旦已经有了 reward <span class="arithmatex">\(r(s,a)\)</span>，可以用 policy gradient 来优化：</p>
+<div class="arithmatex">\[
+\nabla_\theta J(\theta)
+=
+\mathbb{E}_{s,a \sim \pi_\theta}
+\left[
+\nabla_\theta \log \pi_\theta(a \mid s)\, r(s,a)
+\right]
+\]</div>
+<p>这个式子表示：如果某个回答 <span class="arithmatex">\(a\)</span> 在 prompt <span class="arithmatex">\(s\)</span> 下得到更高 reward，那么就提高当前 policy <span class="arithmatex">\(\pi_\theta\)</span> 生成它的概率。其中，<span class="arithmatex">\(J(\theta)\)</span> 是希望最大化的期望 reward 目标，<span class="arithmatex">\(\theta\)</span> 是语言模型参数，<span class="arithmatex">\(\nabla_\theta\)</span> 表示对 <span class="arithmatex">\(\theta\)</span> 求梯度，<span class="arithmatex">\(\mathbb{E}\)</span> 表示对当前模型采样结果取期望，<span class="arithmatex">\(\pi_\theta(a \mid s)\)</span> 是模型在 prompt <span class="arithmatex">\(s\)</span> 下生成回答 <span class="arithmatex">\(a\)</span> 的概率，<span class="arithmatex">\(r(s,a)\)</span> 是该 prompt-answer pair 的 reward。</p>
+<p>PPO 可以通过 importance weighting 和 clipping 让更新更稳定。GRPO 则可以理解为一种更适合 LLM 场景的 baseline 设计：对同一个 prompt 采样多个 completion，用同组 completion 的平均 reward 作为 per-prompt baseline，让模型关心“这个回答比同题其他回答好多少”。</p>
+<p>因此，PPO、REINFORCE、GRPO 的差别主要在 policy optimization；它们不回答 reward 从哪里来。</p>
+<p>这也是为什么很多 LLM 后训练讨论里，真正决定上限的往往不是“换一个 optimizer”，而是 reward 是否可靠。Reward Model 如果学偏了，policy optimization 只会更高效地放大这个偏差。</p>
+<p>这类 learned reward 还有一个重要风险：Reward Model 并不完美，如果无限制地优化，模型可能学会 reward hacking，得到高分却输出无意义文本。常见缓解方式是加入 reference model regularization，也就是用 KL penalty 限制模型不要偏离参考模型太远。更准确地说，训练时优化的不是单纯的 Reward Model 分数，而是带 KL 约束的目标：</p>
+<div class="arithmatex">\[
+J_{\mathrm{reg}}(\theta)
+=
+\mathbb{E}_{a \sim \pi_\theta(\cdot \mid s)}
+\left[
+r_\psi(s,a)
+\right]
+-
+\beta D_{\mathrm{KL}}
+\left(
+\pi_\theta(\cdot \mid s)
+\;\|\;
+\pi_{\mathrm{ref}}(\cdot \mid s)
+\right)
+\]</div>
+<p>这个式子表示：regularized objective <span class="arithmatex">\(J_{\mathrm{reg}}(\theta)\)</span> 等于当前模型生成回答的期望 Reward Model 分数，减去一个 KL 惩罚项。其中，<span class="arithmatex">\(r_\psi(s,a)\)</span> 是 learned reward，<span class="arithmatex">\(\beta\)</span> 控制惩罚强度，<span class="arithmatex">\(D_{\mathrm{KL}}(\cdot\|\cdot)\)</span> 衡量两个分布的差异，<span class="arithmatex">\(\pi_\theta\)</span> 是当前正在训练的模型，<span class="arithmatex">\(\pi_{\mathrm{ref}}\)</span> 是参考模型，通常是 SFT model 或 RL 开始前的模型。</p>
+<p>这不是在重新定义人类价值观，而是在承认 learned reward 有缺陷，因此优化时必须加约束。</p>
+<h2 id="6-dpo-reward-model-reward">6. DPO：没有显式 Reward Model，也仍然有隐含 reward</h2>
+<p>DPO 看起来像是对 RLHF 的简化：不单独训练 Reward Model，也不显式跑 PPO，而是直接用偏好数据优化 policy。</p>
+<p>但这并不意味着 reward 消失了。偏好数据 <span class="arithmatex">\(A \succ B\)</span> 本身仍然表达了一个 reward difference：</p>
+<div class="arithmatex">\[
+r(s,A) &gt; r(s,B)
+\]</div>
+<p>这个式子表示：在同一个 prompt <span class="arithmatex">\(s\)</span> 下，人类更偏好的回答 <span class="arithmatex">\(A\)</span> 应该比回答 <span class="arithmatex">\(B\)</span> 拥有更高的隐含 reward。这里的 <span class="arithmatex">\(A\)</span> 和 <span class="arithmatex">\(B\)</span> 是两个候选 completion，<span class="arithmatex">\(r(s,A)\)</span> 和 <span class="arithmatex">\(r(s,B)\)</span> 分别表示它们在该 prompt 下的 reward。这里没有写成 <span class="arithmatex">\(r_\psi\)</span>，是因为 DPO 不显式训练一个带参数的 Reward Model。</p>
+<p>DPO 的关键是把 KL-regularized RLHF 目标经过推导，转化成一个可以直接训练 policy 的 supervised-style objective。它绕过了显式 Reward Model，但偏好背后仍然隐含着某种 reward ordering。</p>
+<p>所以在文章语境里，可以把 DPO 放在一个中间位置：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-7-1">1</a></span>
+<span class="normal"><a href="#__codelineno-7-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1"></a>RLHF: explicit reward learning + policy optimization
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2"></a>DPO: implicit reward learning inside policy optimization
+</span></code></pre></div></td></tr></table></div>
+<p>它不是传统意义上“先训练 Reward Model，再跑 RL”的流程，但仍然属于从人类偏好中学习行为偏好的路线。换句话说，DPO 弱化了 Reward Model 这个模块，却没有消除 reward-source 问题。</p>
+<h2 id="7-rlvrthinking-reward-irl">7. RLVR：thinking 模型常用的是可验证 reward，不是 IRL</h2>
+<p>如果文章只讲到这里，很容易给人一种印象：LLM RL 基本都可以看成 IRL。但 reasoning / thinking 模型让事情变得更清楚，也更有趣。</p>
+<p>对数学、代码、形式化证明、工具调用这类任务，reward 往往可以直接验证：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-8-1">1</a></span>
+<span class="normal"><a href="#__codelineno-8-2">2</a></span>
+<span class="normal"><a href="#__codelineno-8-3">3</a></span>
+<span class="normal"><a href="#__codelineno-8-4">4</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1"></a>数学题：最终答案是否正确
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2"></a>代码题：单元测试是否通过
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3"></a>工具调用：API 是否成功完成任务
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4"></a>游戏环境：最终分数是多少
+</span></code></pre></div></td></tr></table></div>
+<p>这类训练通常被称为 RL with Verifiable Rewards，简称 RLVR。它和 RLHF 的核心区别不在于是否使用 RL，而在于 reward 来源不同。</p>
+<p>这里说 reward 是“known”，不是说这个 reward 一定完美，也不是说它覆盖了任务的全部质量标准；而是说它不需要从偏好数据中学习，可以由 checker、unit test、verifier 或环境规则直接计算。</p>
+<p>RLHF 是：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-9-1">1</a></span>
+<span class="normal"><a href="#__codelineno-9-2">2</a></span>
+<span class="normal"><a href="#__codelineno-9-3">3</a></span>
+<span class="normal"><a href="#__codelineno-9-4">4</a></span>
+<span class="normal"><a href="#__codelineno-9-5">5</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1"></a>Human Preference
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2"></a>        ↓
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3"></a>Learned Reward Model
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4"></a>        ↓
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5"></a>RL
+</span></code></pre></div></td></tr></table></div>
+<p>RLVR 是：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-10-1">1</a></span>
+<span class="normal"><a href="#__codelineno-10-2">2</a></span>
+<span class="normal"><a href="#__codelineno-10-3">3</a></span>
+<span class="normal"><a href="#__codelineno-10-4">4</a></span>
+<span class="normal"><a href="#__codelineno-10-5">5</a></span>
+<span class="normal"><a href="#__codelineno-10-6">6</a></span>
+<span class="normal"><a href="#__codelineno-10-7">7</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1"></a>Model Answer
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2"></a>        ↓
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3"></a>Verifier / Checker / Test
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4"></a>        ↓
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5"></a>Known reward
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6"></a>        ↓
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7"></a>RL
+</span></code></pre></div></td></tr></table></div>
+<p>如果一道数学题的答案是 42，那么 reward 可以直接写：</p>
+<div class="arithmatex">\[
+r(a)=
+\begin{cases}
+1, &amp; \text{if } \mathrm{answer}(a)=42 \\
+0, &amp; \text{otherwise}
+\end{cases}
+\]</div>
+<p>这个式子表示：对模型生成的回答 <span class="arithmatex">\(a\)</span>，如果从中抽取出的最终答案 <span class="arithmatex">\(\mathrm{answer}(a)\)</span> 等于标准答案 <span class="arithmatex">\(42\)</span>，reward 就是 <span class="arithmatex">\(1\)</span>；否则 reward 是 <span class="arithmatex">\(0\)</span>。这里的 reward 不需要从人类偏好中学习，而是由 checker 直接给出。</p>
+<p>如果一段代码通过所有测试，reward 也可以直接给 1。这里没有从专家行为中反推 reward，也不需要 Reward Model 学习“什么叫正确”。Verifier 执行的是一个已知规则，而 Reward Model 学的是一个未知偏好。</p>
+<p>这就是为什么说，主流 reasoning / thinking 训练里的 RLVR 通常不是 IRL。它更接近标准 RL：reward 已经定义好，算法负责搜索能获得高 reward 的策略。</p>
+<p>当然，完整的大模型产品不只训练推理能力。一个 reasoning model 可能在数学和代码上使用 RLVR，在聊天、安全、拒答风格上仍然使用 RLHF 或偏好学习。因此更准确的理解是：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-11-1">1</a></span>
+<span class="normal"><a href="#__codelineno-11-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1"></a>Reasoning ability: often RLVR
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2"></a>Assistant alignment: often RLHF / preference learning
+</span></code></pre></div></td></tr></table></div>
+<p>同一个模型可以同时经历这两类后训练，只是它们解决的问题不同。</p>
+<h2 id="8-prm-reward-learning">8. PRM：过程奖励又把问题带回 reward learning</h2>
+<p>RLVR 通常奖励最终答案，但推理任务里还有一个自然问题：能不能奖励中间过程？</p>
+<p>例如数学推理中，模型可能最终答案正确，但推理过程有跳步；也可能最终答案错误，但前几步是有价值的。于是出现了 Process Reward Model（PRM）：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-12-1">1</a></span>
+<span class="normal"><a href="#__codelineno-12-2">2</a></span>
+<span class="normal"><a href="#__codelineno-12-3">3</a></span>
+<span class="normal"><a href="#__codelineno-12-4">4</a></span>
+<span class="normal"><a href="#__codelineno-12-5">5</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1"></a>Question
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2"></a>        ↓
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3"></a>Reasoning steps
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4"></a>        ↓
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5"></a>Score each step
+</span></code></pre></div></td></tr></table></div>
+<p>如果每一步是否正确可以由形式化 verifier 判断，那么它仍然更接近 verifiable reward。但很多时候，“这一步推理是否好”并没有唯一客观标准，需要人工标注、偏好比较或模型辅助评审。</p>
+<p>这时 PRM 又带回了 IRL 风格的问题：我们不是直接知道每一步 reward，而是从人类对推理过程的判断中学习一个 reward model。它介于 RLHF 和 RLVR 之间：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-13-1">1</a></span>
+<span class="normal"><a href="#__codelineno-13-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1"></a>最终答案可验证 → 更像 RLVR
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2"></a>过程质量靠偏好标注 → 更像 IRL / reward learning
+</span></code></pre></div></td></tr></table></div>
+<p>这也是为什么 reward source 这个维度比算法名字更清晰。只要 reward 需要从偏好、示范或人工判断中学习，就会带有 IRL 色彩；只要 reward 可以由环境规则直接给出，就更接近标准 RL。</p>
+<h2 id="9">9. 一张表看清几条路线</h2>
+<table>
+<thead>
+<tr>
+<th>训练路线</th>
+<th>Reward 来源</th>
+<th>Reward 是否来自学习/偏好信号</th>
+<th>是否接近 IRL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>传统 RL</td>
+<td>手工定义或环境给出</td>
+<td>否</td>
+<td>否</td>
+</tr>
+<tr>
+<td>IRL</td>
+<td>专家示范</td>
+<td>是</td>
+<td>是</td>
+</tr>
+<tr>
+<td>RLHF / RLAIF</td>
+<td>人类或 AI 偏好</td>
+<td>是，通常显式训练 Reward Model</td>
+<td>是，IRL 风格</td>
+</tr>
+<tr>
+<td>DPO</td>
+<td>偏好数据</td>
+<td>无显式 Reward Model，但有隐含 reward ordering</td>
+<td>部分接近</td>
+</tr>
+<tr>
+<td>RLVR</td>
+<td>verifier、unit test、checker、环境分数</td>
+<td>通常否，reward 可直接计算</td>
+<td>通常否</td>
+</tr>
+<tr>
+<td>PRM</td>
+<td>过程标注、偏好或 verifier</td>
+<td>视来源而定</td>
+<td>可能接近</td>
+</tr>
+<tr>
+<td>Safety Alignment</td>
+<td>人类偏好、红队反馈、规则系统</td>
+<td>常常需要</td>
+<td>常常接近</td>
+</tr>
+</tbody>
+</table>
+<p>这张表的重点不是给每个方法贴标签，而是提醒我们：讨论 LLM RL 时，应该先问 reward 的来源和性质。</p>
+<p>如果 reward 来自人类偏好，最大的问题是偏好数据是否稳定、Reward Model 是否泛化、是否会被 policy hack。如果 reward 来自 verifier，最大的问题则变成 verifier 覆盖了什么、是否过于稀疏、会不会诱导模型只优化最终答案而牺牲过程质量。</p>
+<p>这两类问题都叫 RL，但工程难点完全不同。</p>
+<h2 id="10">10. 几个知名模型怎么放进这张图</h2>
+<p>很多读者熟悉的是模型名字，而不是背后的后训练流程。需要先说明一点：商业模型的完整训练细节通常不会公开，下面只放公开论文、系统卡或技术报告中能确认的高层信息，不把未披露细节当成事实。</p>
+<table>
+<thead>
+<tr>
+<th>模型或论文</th>
+<th>公开资料里能确认的训练线索</th>
+<th>放到本文框架里怎么理解</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>InstructGPT / GPT-3 alignment</td>
+<td>先用人工示范做 SFT，再用人类对多个回答的排序训练 Reward Model，最后用 PPO 做 RLHF。</td>
+<td>典型 RLHF：reward 来自人类偏好，因此是 IRL 风格的 learned reward。</td>
+</tr>
+<tr>
+<td>ChatGPT 类 assistant</td>
+<td>具体每代细节并不完全公开，但公开说明和 InstructGPT 论文共同展示了“预训练模型 + 指令微调 + 人类反馈后训练”的基本路线。</td>
+<td>更适合把它理解成产品化后的 assistant pipeline，而不是某一个固定算法。</td>
+</tr>
+<tr>
+<td>Llama 2-Chat</td>
+<td>论文公开了 SFT、helpfulness / safety reward models，以及使用 rejection sampling 和 PPO 的迭代式 RLHF。</td>
+<td>仍是 preference alignment：reward 主要来自人类偏好模型，但优化方式不只一种。</td>
+</tr>
+<tr>
+<td>Claude / Constitutional AI</td>
+<td>Constitutional AI 论文描述了 supervised self-critique / revision 阶段，以及用 AI preference model 作为 reward signal 的 RLAIF 阶段。</td>
+<td>RLAIF 和 RLHF 类似，区别是偏好反馈更多由 AI 根据原则生成；reward 仍然是 learned reward。</td>
+</tr>
+<tr>
+<td>DeepSeek-R1-Zero / DeepSeek-R1</td>
+<td>R1-Zero 公开描述为在 base model 上直接做大规模 RL；奖励主要是 rule-based accuracy reward 和 format reward。R1 加入 cold-start data 和多阶段训练。</td>
+<td>reasoning RL / RLVR 的典型例子：数学、代码等任务里的 reward 可以由规则、答案或测试直接验证。</td>
+</tr>
+<tr>
+<td>OpenAI o1</td>
+<td>系统卡公开说明 o1 系列通过大规模 reinforcement learning 学习 chain-of-thought reasoning，但没有披露完整 reward 细节。</td>
+<td>可以作为 reasoning RL 的代表，但不应武断说它等同于某一种公开 RLVR 配方。</td>
+</tr>
+</tbody>
+</table>
+<p>这个表的作用不是给模型排队，而是帮助读者把熟悉的名字映射到 reward source：InstructGPT、Llama 2-Chat、Constitutional AI 更接近 learned preference reward；DeepSeek-R1-Zero 更接近 rule-based / verifiable reward；o1 公开确认了大规模 RL reasoning，但 reward 细节应保持谨慎。</p>
+<h2 id="11-llm-reward-source">11. 结论：LLM 后训练的分水岭是 reward source</h2>
+<p>从 IRL 一路看到 LLM RL，可以得到一个比较清晰的框架：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-14-1">1</a></span>
+<span class="normal"><a href="#__codelineno-14-2">2</a></span>
+<span class="normal"><a href="#__codelineno-14-3">3</a></span>
+<span class="normal"><a href="#__codelineno-14-4">4</a></span>
+<span class="normal"><a href="#__codelineno-14-5">5</a></span>
+<span class="normal"><a href="#__codelineno-14-6">6</a></span>
+<span class="normal"><a href="#__codelineno-14-7">7</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1"></a>Reward known:
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2"></a>    Standard RL / RLVR
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3"></a>    重点是优化 policy
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4"></a>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5"></a>Reward unknown:
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6"></a>    IRL / RLHF / preference alignment
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7"></a>    重点是学习 reward
+</span></code></pre></div></td></tr></table></div>
+<p>这里的“known”指 reward 可以由规则、checker、verifier 或环境直接计算；它不等于 reward 一定完整、鲁棒或不可被利用。</p>
+<p>RLHF 之所以和 IRL 有关系，不是因为它用了 PPO，而是因为它从人类偏好中学习 reward。DPO 之所以仍然可以放进这个讨论，也不是因为它显式建模 reward，而是因为偏好数据本身隐含了 reward ordering。</p>
+<p>而 reasoning / thinking 模型里的 RLVR 则提醒我们：并不是所有 LLM RL 都是 IRL。当任务有明确 verifier 时，reward 可以直接给出，训练更像标准 RL。数学、代码、工具调用等任务之所以适合 RLVR，正是因为它们有相对客观的反馈信号。</p>
+<p>因此，一个更稳妥的总结是：</p>
+<blockquote>
+<p>Alignment 更多依赖 learned reward，因为“好回答”很难直接写成函数；Reasoning 更多依赖 verifiable reward，因为“答案是否正确”常常可以被环境验证。</p>
+</blockquote>
+<p>这也解释了为什么 LLM 后训练正在从早期“RLHF 约等于 LLM RL”的叙事，分化成两条并行路线：一条面向偏好、价值和安全，对 reward learning 要求更高；另一条面向数学、代码和工具使用，对 verifier 和可验证环境要求更高。</p>
+<p>最终，LLM RL 的核心问题也许不是“PPO 还是 GRPO”，而是更朴素的一句：</p>
+<blockquote>
+<p>我们到底是在优化一个已知 reward，还是在学习一个未知 reward？</p>
+</blockquote>
+<p>这个问题回答清楚了，IRL、RLHF、DPO、RLVR 和 PRM 之间的关系，也就清楚了。</p>
+<h2 id="_1">参考</h2>
+<ul>
+<li>Berkeley CS 185/285 Deep Reinforcement Learning, Decision Making, and Control, Section 7: <a href="https://rail.eecs.berkeley.edu/deeprlcourse/static/sections/section-7.pdf">Inverse Reinforcement Learning and LLM RL</a></li>
+<li>OpenAI, 2022: <a href="https://openai.com/index/instruction-following/">Aligning language models to follow instructions</a></li>
+<li>Ouyang et al., 2022: <a href="https://arxiv.org/abs/2203.02155">Training language models to follow instructions with human feedback</a></li>
+<li>Touvron et al., 2023: <a href="https://arxiv.org/abs/2307.09288">Llama 2: Open Foundation and Fine-Tuned Chat Models</a></li>
+<li>Bai et al., 2022: <a href="https://arxiv.org/abs/2212.08073">Constitutional AI: Harmlessness from AI Feedback</a></li>
+<li>Rafailov et al., 2023: <a href="https://arxiv.org/abs/2305.18290">Direct Preference Optimization: Your Language Model is Secretly a Reward Model</a></li>
+<li>DeepSeek-AI, 2025: <a href="https://arxiv.org/html/2501.12948">DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning</a></li>
+<li>OpenAI, 2024: <a href="https://openai.com/index/openai-o1-system-card/">OpenAI o1 System Card</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../.." class="md-footer__link md-footer__link--prev" aria-label="上一页: 首页">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                首页
+              </div>
+            </div>
+          </a>
+        
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy", "navigation.footer", "navigation.tabs", "search.suggest", "search.share", "content.action.edit", "content.action.view"], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.92b07e13.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

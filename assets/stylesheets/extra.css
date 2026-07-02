@@ -1,0 +1,12 @@
+.md-grid {
+    max-width: 1200px;
+}
+
+.md-typeset {
+    line-height: 1.75;
+}
+
+.md-tabs__list {
+    display: flex;
+    justify-content: center;
+}
