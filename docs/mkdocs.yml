@@ -1,0 +1,62 @@
+site_name: LLM Agent Lab
+site_description: Notes and practice on AI, LLM, agent systems, and post-training.
+site_url: https://liuzengh.github.io/llm-agent-lab/
+repo_url: https://github.com/liuzengh/llm-agent-lab
+repo_name: liuzengh/llm-agent-lab
+edit_uri: edit/main/docs/mkdocs/
+docs_dir: mkdocs/
+
+nav:
+  - 首页: index.md
+  - Blog:
+      - 从 IRL 到 RLHF，再到 RLVR：LLM 后训练到底在学什么奖励？: blog/irl-rlhf-rlvr-reward-source.md
+
+plugins:
+  - search
+
+theme:
+  name: material
+  language: zh
+  features:
+    - content.code.copy
+    - navigation.footer
+    - navigation.tabs
+    - search.suggest
+    - search.share
+    - content.action.edit
+    - content.action.view
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+  - mdx_truly_sane_lists
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+extra_javascript:
+  - assets/javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
