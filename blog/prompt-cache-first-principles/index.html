@@ -1,0 +1,1784 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Notes and practice on AI, LLM, agent systems, and post-training.">
+      
+      
+      
+        <link rel="canonical" href="https://liuzengh.github.io/llm-agent-lab/blog/prompt-cache-first-principles/">
+      
+      
+        <link rel="prev" href="../irl-rlhf-rlvr-reward-source/">
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.17">
+    
+    
+      
+        <title>Prompt Cache 的价值与原理：少算重复前缀，降低成本和延迟 - LLM Agent Lab</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.7e37652d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#prompt-cache" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../.." title="LLM Agent Lab" class="md-header__button md-logo" aria-label="LLM Agent Lab" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LLM Agent Lab
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Prompt Cache 的价值与原理：少算重复前缀，降低成本和延迟
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="分享" aria-label="分享" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/liuzengh/llm-agent-lab" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    liuzengh/llm-agent-lab
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  首页
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../irl-rlhf-rlvr-reward-source/" class="md-tabs__link">
+          
+  
+  
+  Blog
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LLM Agent Lab" class="md-nav__button md-logo" aria-label="LLM Agent Lab" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LLM Agent Lab
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/liuzengh/llm-agent-lab" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    liuzengh/llm-agent-lab
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    首页
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Blog
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Blog
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../irl-rlhf-rlvr-reward-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    从 IRL 到 RLHF，再到 RLVR：LLM 后训练到底在学什么奖励？
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Prompt Cache 的价值与原理：少算重复前缀，降低成本和延迟
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Prompt Cache 的价值与原理：少算重复前缀，降低成本和延迟
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-prompt-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Prompt Cache 的价值：成本下降和延迟下降
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. 基本定义：模型真正处理的是什么
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-coding-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. 贯穿全文的例子：Coding Agent 的多轮请求
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. 自回归生成：为什么模型必须依赖前文
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-attention-qkv" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Attention 的最小机制：为什么会有 Q/K/V
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-kv-cache-kv" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. KV Cache：为什么 K/V 是可复用状态
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-prefill-decode" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Prefill 和 Decode：一次请求内部的复用
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-prompt-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Prompt Cache：跨请求复用需要什么条件
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. 前缀不变性：一个小定理
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. 为什么只能命中最长公共前缀
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-prompt-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      11. Prompt Cache 不是什么
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    <span class="md-ellipsis">
+      12. 成本模型：到底省了什么
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-sglang" class="md-nav__link">
+    <span class="md-ellipsis">
+      13. 从原理到推理引擎：SGLang 在哪里
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-radixattention" class="md-nav__link">
+    <span class="md-ellipsis">
+      14. RadixAttention：系统怎么找到可复用前缀
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-hicache-gpu-kv" class="md-nav__link">
+    <span class="md-ellipsis">
+      15. HiCache：当 GPU 放不下所有 KV
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16" class="md-nav__link">
+    <span class="md-ellipsis">
+      16. 什么会破坏缓存命中
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17-agent-prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      17. 对 Agent prompt 设计的启发
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18" class="md-nav__link">
+    <span class="md-ellipsis">
+      18. 小结：整条推导链
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      参考资料
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="参考资料">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      入门背景
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      推理系统
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sglang-hicache" class="md-nav__link">
+    <span class="md-ellipsis">
+      推理引擎 / SGLang / HiCache
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      Agent 实践
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-prompt-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Prompt Cache 的价值：成本下降和延迟下降
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. 基本定义：模型真正处理的是什么
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-coding-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. 贯穿全文的例子：Coding Agent 的多轮请求
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. 自回归生成：为什么模型必须依赖前文
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-attention-qkv" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Attention 的最小机制：为什么会有 Q/K/V
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-kv-cache-kv" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. KV Cache：为什么 K/V 是可复用状态
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-prefill-decode" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Prefill 和 Decode：一次请求内部的复用
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-prompt-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Prompt Cache：跨请求复用需要什么条件
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. 前缀不变性：一个小定理
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. 为什么只能命中最长公共前缀
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-prompt-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      11. Prompt Cache 不是什么
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    <span class="md-ellipsis">
+      12. 成本模型：到底省了什么
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-sglang" class="md-nav__link">
+    <span class="md-ellipsis">
+      13. 从原理到推理引擎：SGLang 在哪里
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-radixattention" class="md-nav__link">
+    <span class="md-ellipsis">
+      14. RadixAttention：系统怎么找到可复用前缀
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-hicache-gpu-kv" class="md-nav__link">
+    <span class="md-ellipsis">
+      15. HiCache：当 GPU 放不下所有 KV
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16" class="md-nav__link">
+    <span class="md-ellipsis">
+      16. 什么会破坏缓存命中
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17-agent-prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      17. 对 Agent prompt 设计的启发
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18" class="md-nav__link">
+    <span class="md-ellipsis">
+      18. 小结：整条推导链
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      参考资料
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="参考资料">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      入门背景
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      推理系统
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sglang-hicache" class="md-nav__link">
+    <span class="md-ellipsis">
+      推理引擎 / SGLang / HiCache
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      Agent 实践
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="prompt-cache">Prompt Cache 的价值与原理：少算重复前缀，降低成本和延迟</h1>
+<blockquote>
+<p>缓存不是让模型少看上下文，而是让推理系统少做重复的前缀计算。</p>
+</blockquote>
+<p>Agent 时代的 LLM 请求越来越长：system prompt、工具定义、项目规则、历史消息、tool result、文件片段和命令输出会在多轮请求之间反复出现。Prompt Cache 要回答的问题是：既然前面大段 token 完全相同，推理系统能不能复用已经算过的内部状态，而不是每轮都重新 prefill？</p>
+<p>本文先说明 Prompt Cache 的现实价值：它如何降低 token 计费成本和请求延迟。随后再从缓存成立的基本条件出发，依次定义 token、position、prefix、suffix 和 LCP，推导自回归生成、attention、KV Cache、前缀不变性和成本模型，最后说明推理引擎如何把这个性质工程化。vLLM 和 SGLang 都是代表性的 LLM 推理引擎，本文后半部分以 SGLang 的 RadixAttention 和 HiCache 为例。</p>
+<h2 id="1-prompt-cache">1. Prompt Cache 的价值：成本下降和延迟下降</h2>
+<p>Prompt Cache 的价值可以从两个维度看：token 计费成本和请求延迟。</p>
+<p>在成本上，Prompt Cache 把一部分重复输入 token 从“缓存未命中输入”变成“缓存命中输入”。不同服务商的计费方式不同，但如果服务商对 cache hit input token 单独定价，收益会非常直观。</p>
+<p>以 <a href="https://api-docs.deepseek.com/zh-cn/quick_start/pricing">DeepSeek API 模型价格</a> 在 2026-07-07 访问到的价格为例，输入 token 价格按“百万 tokens”计费，并区分缓存命中和缓存未命中：</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th style="text-align: right;">输入缓存命中</th>
+<th style="text-align: right;">输入缓存未命中</th>
+<th style="text-align: right;">输出</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>deepseek-v4-flash</td>
+<td style="text-align: right;">0.02 元 / 百万 tokens</td>
+<td style="text-align: right;">1 元 / 百万 tokens</td>
+<td style="text-align: right;">2 元 / 百万 tokens</td>
+</tr>
+<tr>
+<td>deepseek-v4-pro</td>
+<td style="text-align: right;">0.025 元 / 百万 tokens</td>
+<td style="text-align: right;">3 元 / 百万 tokens</td>
+<td style="text-align: right;">6 元 / 百万 tokens</td>
+</tr>
+</tbody>
+</table>
+<p>这个价格结构说明了 Prompt Cache 的经济价值：对 deepseek-v4-flash，缓存命中的输入价格是未命中的 2%；对 deepseek-v4-pro，缓存命中的输入价格约为未命中的 0.83%。价格可能随服务商策略变化，但这种“cached input 比 uncached input 便宜很多”的结构，正是 Prompt Cache 在长上下文和多轮 Agent 场景中有价值的原因。</p>
+<p>假设某个 coding agent 每轮有 100K tokens 的稳定前缀反复出现：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1"></a>repeated prefix = 100K input tokens
+</span></code></pre></div></td></tr></table></div>
+<p>如果这些 token 在 deepseek-v4-flash 上未命中缓存，输入成本约为：</p>
+<div class="arithmatex">\[
+0.1 \times 1 = 0.1 \text{ 元}
+\]</div>
+<p>如果命中缓存，输入成本约为：</p>
+<div class="arithmatex">\[
+0.1 \times 0.02 = 0.002 \text{ 元}
+\]</div>
+<p>这里的 <span class="arithmatex">\(0.1\)</span> 表示 100K tokens 等于 0.1 百万 tokens。单轮看差额不大，但 Agent 的特点是高频、多轮、长上下文；当同一类长前缀在大量请求中反复出现时，cache hit 会直接影响整体推理成本。</p>
+<p>在延迟上，Prompt Cache 主要降低 time to first token。长 prompt 的第一步通常要经过 prefill：模型需要处理完整输入，并生成所有输入 token 的 KV state。如果前缀命中缓存，系统可以跳过重复前缀的 prefill，只对新增 suffix 做 extend。</p>
+<p>因此，Prompt Cache 对延迟的收益可以概括为：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-1-1">1</a></span>
+<span class="normal"><a href="#__codelineno-1-2">2</a></span>
+<span class="normal"><a href="#__codelineno-1-3">3</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1"></a>更少重复 prefill
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2"></a>-&gt; 更低 TTFT
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3"></a>-&gt; 多轮 Agent 交互更接近连续响应
+</span></code></pre></div></td></tr></table></div>
+<p>这并不意味着所有请求都会无条件变快。真实收益仍然取决于前缀长度、命中率、KV 所在层级、fetch 成本、batching 和调度策略。如果 KV 已经在 GPU 上，取回成本低，延迟收益通常更直接；如果 KV 在 CPU、磁盘或远端存储，系统就需要 prefetch、I/O overlap 和 cache-aware scheduling 来避免取回成本抵消计算收益。</p>
+<p>Prompt Cache 的核心定义是：</p>
+<blockquote>
+<p>Prompt Cache 不是缓存回答，而是缓存相同 prompt 前缀在模型内部算出来的 KV state，让下一次请求只计算新增部分。</p>
+</blockquote>
+<p>但如果从第一性原理出发，我们不应该一开始就接受这个结论。我们要先问一个更基本的问题：<strong>任何缓存为什么可以成立？</strong></p>
+<p>答案来自缓存的基本条件：</p>
+<blockquote>
+<p>同一个确定性函数，在相同输入下，会产生相同输出。缓存就是把这个输出保存下来，下次遇到相同输入时直接复用。</p>
+</blockquote>
+<p>在本文中，可以把缓存条件直接写成推理系统里的关系：</p>
+<div class="arithmatex">\[
+\text{相同计算过程}+\text{相同输入}
+\Rightarrow
+\text{相同内部状态}
+\]</div>
+<p>Prompt Cache 要证明的正是：在相同模型和相同推理配置下，相同 token 前缀会产生相同的内部 KV state。缓存的正确性来自这个不变性。</p>
+<p>Prompt Cache 只是把这件事放进 LLM 推理里：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-2-1">1</a></span>
+<span class="normal"><a href="#__codelineno-2-2">2</a></span>
+<span class="normal"><a href="#__codelineno-2-3">3</a></span>
+<span class="normal"><a href="#__codelineno-2-4">4</a></span>
+<span class="normal"><a href="#__codelineno-2-5">5</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1"></a>确定性计算
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2"></a>-&gt; 相同 token 前缀
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3"></a>-&gt; 相同位置和模型配置
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4"></a>-&gt; 相同 KV state
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5"></a>-&gt; 可以跨请求复用
+</span></code></pre></div></td></tr></table></div>
+<p>本文会从最基本的定义出发，一步步推到这个结论。目标读者是有基本编程常识、但不默认懂 Transformer 的读者。你不需要先知道 KV Cache 是什么；我们会从 token、position、自回归生成和 attention 开始推。</p>
+<h2 id="2">2. 基本定义：模型真正处理的是什么</h2>
+<p>LLM 不直接处理原始字符串，而是先把文本切成 token 序列。</p>
+<p>设原始文本是：</p>
+<div class="arithmatex">\[
+\mathrm{text}
+\]</div>
+<p>tokenizer 会把它变成：</p>
+<div class="arithmatex">\[
+\mathrm{tokens}(\mathrm{text})=(x_1,x_2,\ldots,x_n)
+\]</div>
+<p>模型实际接收的不是字符串本身，而是一串 token id。一个中文词、英文单词片段、标点、空格，都可能对应一个或多个 token。</p>
+<p>每个 token 还有自己的位置编号：</p>
+<div class="arithmatex">\[
+\mathrm{pos}(x_i)=i
+\]</div>
+<p>位置会参与模型计算。同一段文本如果出现在不同位置，它在模型内部产生的状态通常也不同。</p>
+<p>接下来定义几个本文反复使用的概念。</p>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>定义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>prompt</td>
+<td>输入给模型的 token 序列，记作 <span class="arithmatex">\(X=(x_1,\ldots,x_n)\)</span>。</td>
+</tr>
+<tr>
+<td>prefix</td>
+<td>prompt 的前一段，记作 <span class="arithmatex">\(P=X[1:p]=(x_1,\ldots,x_p)\)</span>。</td>
+</tr>
+<tr>
+<td>suffix</td>
+<td>prompt 中 prefix 后面的部分，记作 <span class="arithmatex">\(S=X[p+1:n]\)</span>。</td>
+</tr>
+<tr>
+<td>LCP</td>
+<td>longest common prefix，两个 token 序列从开头开始完全相同的最长部分。</td>
+</tr>
+<tr>
+<td>position</td>
+<td>token 在序列中的位置编号，常见位置编码和 RoPE 都依赖它。</td>
+</tr>
+</tbody>
+</table>
+<p>因此，本文说“相同前缀”，指的是：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-3-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1"></a>token 序列从第 1 个 token 开始完全相同，并且位置也相同。
+</span></code></pre></div></td></tr></table></div>
+<p>不是原始字符串看起来差不多，也不是语义相似。</p>
+<h2 id="3-coding-agent">3. 贯穿全文的例子：Coding Agent 的多轮请求</h2>
+<p>以 coding agent 为例，一次模型请求通常不只有用户最新的问题，还会包含 system prompt、工具定义、项目规则、历史消息、tool result、文件片段、命令输出等上下文。</p>
+<p>多轮交互大概长这样：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-4-1">1</a></span>
+<span class="normal"><a href="#__codelineno-4-2">2</a></span>
+<span class="normal"><a href="#__codelineno-4-3">3</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1"></a>第 1 轮: system + tools + user_1
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2"></a>第 2 轮: system + tools + user_1 + assistant_1 + user_2
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3"></a>第 3 轮: system + tools + user_1 + assistant_1 + user_2 + assistant_2 + user_3
+</span></code></pre></div></td></tr></table></div>
+<p>把每一轮都看成一个 token 序列：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-5-1">1</a></span>
+<span class="normal"><a href="#__codelineno-5-2">2</a></span>
+<span class="normal"><a href="#__codelineno-5-3">3</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1"></a>X_1 = [system][tools][user_1]
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2"></a>X_2 = [system][tools][user_1][assistant_1][user_2]
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3"></a>X_3 = [system][tools][user_1][assistant_1][user_2][assistant_2][user_3]
+</span></code></pre></div></td></tr></table></div>
+<p>那么：</p>
+<ul>
+<li><span class="arithmatex">\(X_1\)</span> 和 <span class="arithmatex">\(X_2\)</span> 的 LCP 是 <code>[system][tools][user_1]</code>。</li>
+<li><span class="arithmatex">\(X_2\)</span> 和 <span class="arithmatex">\(X_3\)</span> 的 LCP 是 <code>[system][tools][user_1][assistant_1][user_2]</code>。</li>
+<li>第 2 轮相对第 1 轮的 suffix 是 <code>[assistant_1][user_2]</code>。</li>
+<li>第 3 轮相对第 2 轮的 suffix 是 <code>[assistant_2][user_3]</code>。</li>
+</ul>
+<p>Prompt Cache 的目标是：如果前缀已经在上一轮算过，下一轮就复用这个前缀的内部状态，只计算新增 suffix。</p>
+<p>但要证明这件事正确，我们需要先理解 LLM 推理到底在算什么。</p>
+<h2 id="4">4. 自回归生成：为什么模型必须依赖前文</h2>
+<p>LLM 生成文本时，不是一次性生成完整答案，而是一个 token 一个 token 地生成。</p>
+<p>给定 prompt：</p>
+<div class="arithmatex">\[
+P=(x_1,x_2,\ldots,x_n)
+\]</div>
+<p>模型要继续生成：</p>
+<div class="arithmatex">\[
+Y=(y_1,y_2,\ldots,y_m)
+\]</div>
+<p>自回归语言模型把这个过程写成：</p>
+<div class="arithmatex">\[
+p(Y \mid P)=\prod_{t=1}^{m}p(y_t \mid P,y_{&lt;t})
+\]</div>
+<p>该公式表示：生成第 <span class="arithmatex">\(t\)</span> 个输出 token 时，模型必须基于完整 prompt 和此前已经生成的所有 token 来判断下一个 token 应该是什么。</p>
+<p>把 prompt 和已经生成的 token 合在一起，记作当前上下文：</p>
+<div class="arithmatex">\[
+Z_t=(z_1,z_2,\ldots,z_t)
+\]</div>
+<p>模型下一步要计算的是：</p>
+<div class="arithmatex">\[
+p(z_{t+1}\mid Z_t)
+\]</div>
+<p>这就解释了为什么模型不能只看最新用户输入。回到 coding agent 的第 3 轮，模型生成回答时需要基于：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-6-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1"></a>system + tools + user_1 + assistant_1 + user_2 + assistant_2 + user_3
+</span></code></pre></div></td></tr></table></div>
+<p>Prompt Cache 不能让模型少看这些上下文。它只能让模型不用重新计算已经处理过的前缀。</p>
+<h2 id="5-attention-qkv">5. Attention 的最小机制：为什么会有 Q/K/V</h2>
+<p>现在看一层 causal self-attention。你不需要掌握完整 Transformer，只需要知道每个 token 在每一层都会产生三类向量：</p>
+<ul>
+<li>Query：当前 token 想查什么。</li>
+<li>Key：某个历史 token 可以如何被匹配。</li>
+<li>Value：这个历史 token 真正提供的信息。</li>
+</ul>
+<p>第 <span class="arithmatex">\(l\)</span> 层里，第 <span class="arithmatex">\(i\)</span> 个 token 的上一层 hidden state 是 <span class="arithmatex">\(h_i^{l-1}\)</span>。模型通过三个权重矩阵得到：</p>
+<div class="arithmatex">\[
+\begin{aligned}
+q_i^l &amp;= h_i^{l-1}W_Q^l \\
+k_i^l &amp;= h_i^{l-1}W_K^l \\
+v_i^l &amp;= h_i^{l-1}W_V^l
+\end{aligned}
+\]</div>
+<p>Query、Key、Value 不是额外输入，而是模型从每个 token 的中间表示里算出来的三个视角。</p>
+<p>在 causal mask 下，第 <span class="arithmatex">\(i\)</span> 个位置只能看见 <span class="arithmatex">\(1,\ldots,i\)</span>，不能看见未来 token。它的 attention 输出可以粗略写成：</p>
+<div class="arithmatex">\[
+a_i^l=
+\mathrm{softmax}
+\left(
+\frac{q_i^l(K_{1:i}^l)^\top}{\sqrt{d_k}}
+\right)
+V_{1:i}^l
+\]</div>
+<p>这个式子描述的是：当前位置拿自己的 Query 去匹配它能看到的历史 Key，再用匹配权重加权读取历史 Value。</p>
+<p>这里出现了 Prompt Cache 的关键线索：未来 token 要理解自己时，需要查询历史 token 的 Key 和 Value。因此，如果历史 token 的 Key/Value 已经算过，就不必每次重新算。</p>
+<h2 id="6-kv-cache-kv">6. KV Cache：为什么 K/V 是可复用状态</h2>
+<p>设当前上下文是：</p>
+<div class="arithmatex">\[
+Z_t=(z_1,z_2,\ldots,z_t)
+\]</div>
+<p>模型处理完这段上下文后，可以保存每一层的历史 Key/Value：</p>
+<div class="arithmatex">\[
+\mathcal{C}(Z_t)=\{K_{1:t}^l,V_{1:t}^l\}_{l=1}^{L}
+\]</div>
+<p>KV Cache 保存的是从第 1 个 token 到第 <span class="arithmatex">\(t\)</span> 个 token，在每一层里算出来的 Key/Value。</p>
+<p>为什么这足以支持继续生成？</p>
+<p>当新 token <span class="arithmatex">\(z_{t+1}\)</span> 来的时候，它在每一层都需要读取历史：</p>
+<div class="arithmatex">\[
+K_{1:t+1}^l=[K_{1:t}^l,k_{t+1}^l],\quad
+V_{1:t+1}^l=[V_{1:t}^l,v_{t+1}^l]
+\]</div>
+<p>历史 K/V 可以直接拿来用；模型只需要计算新 token 自己的 <span class="arithmatex">\(k_{t+1}^l\)</span> 和 <span class="arithmatex">\(v_{t+1}^l\)</span>，然后追加到 cache 里。</p>
+<p>所以 KV Cache 不是“记住模型回答了什么”，而是保存“未来 token 做 attention 时必须查询的历史 Key/Value”。</p>
+<p>这就是第一次复用：<strong>同一次请求内部，decode 不必每一步都重新计算历史 token。</strong></p>
+<h2 id="7-prefill-decode">7. Prefill 和 Decode：一次请求内部的复用</h2>
+<p>一次 LLM 请求通常分成两个阶段。</p>
+<p>第一阶段叫 prefill，也就是先处理输入 prompt：</p>
+<div class="arithmatex">\[
+P=(x_1,\ldots,x_n)
+\]</div>
+<p>并生成它的 KV Cache：</p>
+<div class="arithmatex">\[
+\mathcal{C}(P)
+\]</div>
+<p>prefill 阶段会先处理完整输入 prompt，并保存后续生成会用到的历史 K/V。长 prompt 的 time to first token，也就是从请求发出到第一个输出 token 出现的时间，很多时候主要花在 prefill。</p>
+<p>第二阶段叫 decode，也就是逐 token 生成输出。第 <span class="arithmatex">\(t\)</span> 步 decode 使用已有缓存：</p>
+<div class="arithmatex">\[
+\mathcal{C}(P,y_{&lt;t})
+\]</div>
+<p>然后计算新 token，并把新 token 的 K/V 追加进去：</p>
+<div class="arithmatex">\[
+\mathcal{C}(P,y_{\le t})
+=
+\mathrm{Append}(\mathcal{C}(P,y_{&lt;t}),K_{y_t},V_{y_t})
+\]</div>
+<p>普通 KV Cache 已经让同一次请求里的 decode 避免反复重算历史。</p>
+<p>但 Agent 场景还有一个更大的重复：不同请求之间，前面的大段 prompt 经常完全一样。Prompt Cache，也叫 Prefix Cache，要把 KV Cache 从“请求内部复用”扩展到“请求之间复用”。</p>
+<h2 id="8-prompt-cache">8. Prompt Cache：跨请求复用需要什么条件</h2>
+<p>现在设两个请求：</p>
+<div class="arithmatex">\[
+A=P+S,\quad B=P+T
+\]</div>
+<p>它们共享同一个前缀 <span class="arithmatex">\(P\)</span>，后缀 <span class="arithmatex">\(S\)</span> 和 <span class="arithmatex">\(T\)</span> 可以不同。</p>
+<p>Prompt Cache 要复用的是：</p>
+<div class="arithmatex">\[
+\mathcal{C}_A(P)=\mathcal{C}_B(P)
+\]</div>
+<p>如果两个请求的前缀 <span class="arithmatex">\(P\)</span> 完全相同，那么第一个请求里算出来的前缀 KV state，第二个请求也可以用。</p>
+<p>但这要求下面这些条件一致：</p>
+<ul>
+<li>token 序列一致。</li>
+<li>position ids 或 RoPE 位置编号一致。</li>
+<li>模型权重一致。</li>
+<li>tokenizer 一致。</li>
+<li>adapter / LoRA / quantization 配置一致。</li>
+<li>attention mask 一致。</li>
+<li>推理阶段没有会改变前缀中间状态的随机性。</li>
+</ul>
+<p>这些条件可以概括为：</p>
+<blockquote>
+<p>缓存的是模型内部张量，不是文本字符串。只有内部计算路径一致，KV state 才能被认为是同一个输出。</p>
+</blockquote>
+<p>接下来证明这个复用为什么成立。</p>
+<h2 id="9">9. 前缀不变性：一个小定理</h2>
+<p><strong>定理：</strong> 对 causal Transformer，如果两个请求共享完全相同的 token 前缀 <span class="arithmatex">\(P\)</span>，并且位置、模型权重和推理配置一致，那么这个前缀在所有层产生的 KV state 相同。</p>
+<p>也就是：</p>
+<div class="arithmatex">\[
+A=P+S,\quad B=P+T
+\quad\Rightarrow\quad
+\mathcal{C}_A(P)=\mathcal{C}_B(P)
+\]</div>
+<p>这表示：后面接什么，不会改变前面已经算出来的状态。</p>
+<p><strong>Base：第 0 层相同。</strong></p>
+<p>第 0 层来自 token embedding 和位置相关信息：</p>
+<div class="arithmatex">\[
+h_i^0=\mathrm{Embed}(x_i,\mathrm{pos}_i)
+\]</div>
+<p>如果 <span class="arithmatex">\(A\)</span> 和 <span class="arithmatex">\(B\)</span> 的前缀 token 相同，位置也相同，那么对所有 <span class="arithmatex">\(i\le p\)</span>：</p>
+<div class="arithmatex">\[
+h_{A,i}^0=h_{B,i}^0
+\]</div>
+<p>同一个 token 放在同一个位置，进入模型的初始表示相同。</p>
+<p><strong>Step：如果第 <span class="arithmatex">\(l-1\)</span> 层前缀相同，则第 <span class="arithmatex">\(l\)</span> 层前缀也相同。</strong></p>
+<p>假设：</p>
+<div class="arithmatex">\[
+H_A^{l-1}[1:p]=H_B^{l-1}[1:p]
+\]</div>
+<p>那么前缀位置的 Q/K/V 也相同：</p>
+<div class="arithmatex">\[
+Q_A^l[1:p]=Q_B^l[1:p],\quad
+K_A^l[1:p]=K_B^l[1:p],\quad
+V_A^l[1:p]=V_B^l[1:p]
+\]</div>
+<p>对任意前缀位置 <span class="arithmatex">\(i\le p\)</span>，causal mask 让它只能读取 <span class="arithmatex">\(1,\ldots,i\)</span> 的 K/V，不能读取后缀：</p>
+<div class="arithmatex">\[
+a_i^l=
+\mathrm{softmax}
+\left(
+\frac{q_i^l(K_{1:i}^l)^\top}{\sqrt{d_k}}
+\right)
+V_{1:i}^l
+\]</div>
+<p>由于 <span class="arithmatex">\(A\)</span> 和 <span class="arithmatex">\(B\)</span> 在 <span class="arithmatex">\(1,\ldots,i\)</span> 的 Q/K/V 都相同，所以：</p>
+<div class="arithmatex">\[
+a_{A,i}^l=a_{B,i}^l
+\]</div>
+<p>attention 之后的残差、LayerNorm、MLP 等操作也是确定性的，并且不会读取未来位置。因此：</p>
+<div class="arithmatex">\[
+h_{A,i}^l=h_{B,i}^l,\quad i\le p
+\]</div>
+<p><strong>Conclusion：前缀 KV state 相同。</strong></p>
+<p>归纳完成后，对所有层 <span class="arithmatex">\(l=1,\ldots,L\)</span>：</p>
+<div class="arithmatex">\[
+K_A^l[1:p]=K_B^l[1:p],\quad
+V_A^l[1:p]=V_B^l[1:p]
+\]</div>
+<p>因此：</p>
+<div class="arithmatex">\[
+\mathcal{C}_A(P)=\mathcal{C}_B(P)
+\]</div>
+<p>这就是 Prompt Cache 的数学基础。它不是“语义相似所以可以复用”，也不是“近似相同所以可以复用”。它依赖的是 causal mask 带来的前缀不变性。</p>
+<h2 id="10">10. 为什么只能命中最长公共前缀</h2>
+<p>Prefix Cache 命中的不是任意相同文本片段，而是 token 序列的最长公共前缀。</p>
+<p>公式写成：</p>
+<div class="arithmatex">\[
+\mathrm{hit\_length}=\mathrm{LCP}(\mathrm{tokens}(A),\mathrm{tokens}(B))
+\]</div>
+<p>缓存命中长度由两个请求从第一个 token 开始的共同部分决定；比较到第一个不同 token 为止，之前的部分可以复用，从第一个不同 token 开始，后面都不能保证复用。</p>
+<p>看两个 prompt：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-7-1">1</a></span>
+<span class="normal"><a href="#__codelineno-7-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1"></a>A = [system][tools][user]
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2"></a>B = [system][timestamp][tools][user]
+</span></code></pre></div></td></tr></table></div>
+<p>它们都包含 <code>tools</code> 和 <code>user</code>，但 <code>tools</code> 在两个请求里的位置不同，前面的上下文也不同。所以 <code>tools</code> 这段文本不能单独拿出来复用。</p>
+<p>回到 coding agent 的例子：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-8-1">1</a></span>
+<span class="normal"><a href="#__codelineno-8-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1"></a>X_1 = [system][tools][user_1]
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2"></a>X_2 = [system][tools][user_1][assistant_1][user_2]
+</span></code></pre></div></td></tr></table></div>
+<p>这里的 LCP 是：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-9-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1"></a>[system][tools][user_1]
+</span></code></pre></div></td></tr></table></div>
+<p>所以第 2 轮可以复用这段前缀，只计算：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-10-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1"></a>[assistant_1][user_2]
+</span></code></pre></div></td></tr></table></div>
+<p>因此，“把稳定内容放前面，把动态内容放后面”的本质，是最大化 LCP。</p>
+<h2 id="11-prompt-cache">11. Prompt Cache 不是什么</h2>
+<p>很多误解都来自一个词：cache。我们平时说缓存，可能指缓存网页、缓存接口响应、缓存搜索结果。但 Prompt Cache 不是这些东西。</p>
+<table>
+<thead>
+<tr>
+<th>容易混淆的东西</th>
+<th>缓存对象</th>
+<th>命中条件</th>
+<th>和 Prompt Cache 的关系</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>回答缓存</td>
+<td>最终回答文本</td>
+<td>问题完全相同或 key 相同</td>
+<td>不是 Prompt Cache。回答缓存直接复用输出。</td>
+</tr>
+<tr>
+<td>语义缓存</td>
+<td>相似问题、相似查询、相似回答</td>
+<td>语义相似</td>
+<td>不是 Prompt Cache。Prompt Cache 要求 token 级前缀一致。</td>
+</tr>
+<tr>
+<td>RAG cache</td>
+<td>检索结果或文档片段</td>
+<td>查询相同或相似</td>
+<td>不是 Prompt Cache。它缓存的是外部检索结果。</td>
+</tr>
+<tr>
+<td>Decode KV Cache</td>
+<td>当前请求内历史 token 的 KV</td>
+<td>同一次 generation 内</td>
+<td>是 KV Cache，但通常不跨请求。</td>
+</tr>
+<tr>
+<td>Prefix / Prompt Cache</td>
+<td>跨请求共享前缀的 KV state</td>
+<td>token 级最长公共前缀一致</td>
+<td>本文讨论的对象。</td>
+</tr>
+</tbody>
+</table>
+<p>三者的关键区别是：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-11-1">1</a></span>
+<span class="normal"><a href="#__codelineno-11-2">2</a></span>
+<span class="normal"><a href="#__codelineno-11-3">3</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1"></a>回答缓存复用答案。
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2"></a>语义缓存复用业务结果。
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3"></a>Prompt Cache 复用模型内部状态。
+</span></code></pre></div></td></tr></table></div>
+<p>Prompt Cache 要求的是更机械、更严格的相同：token 序列从开头开始完全一致。</p>
+<h2 id="12">12. 成本模型：到底省了什么</h2>
+<p>设：</p>
+<div class="arithmatex">\[
+\begin{aligned}
+p &amp;= \text{cached prefix length} \\
+s &amp;= \text{new suffix length} \\
+L &amp;= \text{number of layers} \\
+d &amp;= \text{hidden size}
+\end{aligned}
+\]</div>
+<p>如果没有 Prompt Cache，需要完整 prefill 长度为 <span class="arithmatex">\(p+s\)</span> 的 prompt。粗略成本是：</p>
+<div class="arithmatex">\[
+T_{\mathrm{full}}(p+s)
+\approx
+L[O((p+s)d^2)+O((p+s)^2d)]
+\]</div>
+<p>完整 prefill 需要对整个 prompt 做逐 token 计算，也要计算 prompt 内部大量 attention 关系。</p>
+<p>如果前缀 <span class="arithmatex">\(P\)</span> 已经缓存，只需要对新增后缀做 extend：</p>
+<div class="arithmatex">\[
+T_{\mathrm{cached}}(p,s)
+\approx
+L[O(sd^2)+O((sp+s^2)d)]+T_{\mathrm{fetch}}(p)
+\]</div>
+<p>缓存命中后，模型只需要对新增的 <span class="arithmatex">\(s\)</span> 个 token 做大部分逐 token 计算；但这些新 token 仍然要读前缀的 KV，所以还有 <span class="arithmatex">\(sp\)</span> 相关的 attention 成本。另外，系统还要付出把前缀 KV 从缓存里取回来的成本。</p>
+<p>逐项看：</p>
+<ul>
+<li><span class="arithmatex">\(O(sd^2)\)</span>：新增后缀 token 的 projection、MLP 等逐 token 计算。</li>
+<li><span class="arithmatex">\(O(spd)\)</span>：后缀 token 仍然要 attend 到前缀 KV。</li>
+<li><span class="arithmatex">\(O(s^2d)\)</span>：后缀 token 之间也要互相 attention。</li>
+<li><span class="arithmatex">\(T_{\mathrm{fetch}}(p)\)</span>：从缓存系统取回前缀 KV 的成本。</li>
+</ul>
+<p>所以，Prompt Cache 主要省掉的是：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-12-1">1</a></span>
+<span class="normal"><a href="#__codelineno-12-2">2</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1"></a>前缀 token 自己的 projection / MLP
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2"></a>前缀内部 token 之间的 attention
+</span></code></pre></div></td></tr></table></div>
+<p>它没有省掉的是：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-13-1">1</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1"></a>后缀 token 读取前缀 K/V 的 attention
+</span></code></pre></div></td></tr></table></div>
+<p>因此一个关键结论是：</p>
+<blockquote>
+<p>Prompt Cache 降低的是重复 prefill 的成本，不是让模型少看上下文。</p>
+</blockquote>
+<p>Prompt Cache 是否划算，取决于：</p>
+<div class="arithmatex">\[
+\text{cost of recomputing prefix}
+&gt;
+\text{cost of fetching prefix KV}
+\]</div>
+<p>如果 KV 在 GPU 显存里，取回成本通常很小；如果 KV 被放到 CPU、磁盘或远端存储，取回成本可能变成主要瓶颈。</p>
+<p>到这里，Prompt Cache 为什么正确、为什么只能命中前缀、到底省了什么，已经讲完了。接下来要进入系统实现层：推理引擎如何在真实服务中查找、保存、搬运、淘汰和调度这些 KV state。</p>
+<h2 id="13-sglang">13. 从原理到推理引擎：SGLang 在哪里</h2>
+<p>前面的推导只说明了一件事：在满足条件时，前缀 KV state 可以被复用。但一个线上 LLM 服务还需要回答一组工程问题：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-14-1">1</a></span>
+<span class="normal"><a href="#__codelineno-14-2">2</a></span>
+<span class="normal"><a href="#__codelineno-14-3">3</a></span>
+<span class="normal"><a href="#__codelineno-14-4">4</a></span>
+<span class="normal"><a href="#__codelineno-14-5">5</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1"></a>请求来了，怎么找到它和历史请求的最长公共前缀？
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2"></a>命中的 KV 放在什么地方？
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3"></a>GPU 显存不够时淘汰谁？
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4"></a>多个请求一起服务时，怎么调度才能提高命中率？
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5"></a>KV 不在 GPU 上时，什么时候搬回来？
+</span></code></pre></div></td></tr></table></div>
+<p>这些问题通常由 LLM 推理引擎处理。推理引擎位于模型权重和上层 API / Agent 应用之间，负责把请求真正跑起来：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-15-1">1</a></span>
+<span class="normal"><a href="#__codelineno-15-2">2</a></span>
+<span class="normal"><a href="#__codelineno-15-3">3</a></span>
+<span class="normal"><a href="#__codelineno-15-4">4</a></span>
+<span class="normal"><a href="#__codelineno-15-5">5</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1"></a>Agent / API Server
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2"></a>        ↓
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3"></a>LLM Inference Engine
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4"></a>        ↓
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5"></a>Model Weights + GPU / CPU / Storage
+</span></code></pre></div></td></tr></table></div>
+<p>推理引擎要处理的工作包括 prefill、decode、batching、KV cache 管理、显存分页、请求调度、流式输出和并发控制。vLLM 和 SGLang 都属于这一层：它们不是新的模型结构，而是让模型在服务阶段更高效运行的系统。</p>
+<p>本文选择 SGLang 作为例子，是因为它围绕 prefix KV reuse 给出了很清晰的工程机制：</p>
+<ul>
+<li>RadixAttention：用前缀树组织 token 序列，自动发现和复用最长公共前缀。</li>
+<li>HiCache：当 GPU 放不下所有 KV 时，把 KV cache 扩展到 GPU、CPU 和远端存储的层级体系。</li>
+</ul>
+<p>因此，后面的 SGLang 部分不是在证明 Prompt Cache 为什么成立；这个证明已经在前缀不变性里完成了。SGLang 展示的是：当这个性质进入真实推理服务后，系统需要怎样组织数据结构、内存层级和调度策略。</p>
+<h2 id="14-radixattention">14. RadixAttention：系统怎么找到可复用前缀</h2>
+<p>在 SGLang 里，RadixAttention 可以理解为：用一棵 radix tree，也就是压缩前缀树，来组织已经缓存的 token 路径。</p>
+<p>想象每个请求都是从 root 出发的一条路径：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-16-1">1</a></span>
+<span class="normal"><a href="#__codelineno-16-2">2</a></span>
+<span class="normal"><a href="#__codelineno-16-3">3</a></span>
+<span class="normal"><a href="#__codelineno-16-4">4</a></span>
+<span class="normal"><a href="#__codelineno-16-5">5</a></span>
+<span class="normal"><a href="#__codelineno-16-6">6</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1"></a>root
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2"></a> └── system
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3"></a>      └── tools
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4"></a>           └── history
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5"></a>                ├── user_a
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6"></a>                └── user_b
+</span></code></pre></div></td></tr></table></div>
+<p>共享路径就是可复用前缀。新请求来了以后，运行时沿着树往下找，找到最长已经缓存的前缀，然后只计算没命中的 suffix。</p>
+<p>可以写成：</p>
+<div class="arithmatex">\[
+\mathrm{Request}=R+U
+\]</div>
+<p>其中 <span class="arithmatex">\(R\)</span> 是 longest cached prefix，也就是最长已缓存前缀；<span class="arithmatex">\(U\)</span> 是 uncached suffix，也就是没有命中的新增后缀。</p>
+<p>运行时做的事情是：</p>
+<div class="arithmatex">\[
+\mathrm{Compute}(\mathrm{Request})
+=
+\mathrm{FetchKV}(R)
++
+\mathrm{Prefill}(U \mid \mathcal{C}(R))
+\]</div>
+<p>运行时先取出最长命中前缀 <span class="arithmatex">\(R\)</span> 的 KV，再基于这些 KV 处理新增后缀 <span class="arithmatex">\(U\)</span>。</p>
+<p>RadixAttention 的工程价值不只是“有一棵树”。它还要处理：</p>
+<ul>
+<li>prefix search：新请求来了，快速找到最长可复用前缀。</li>
+<li>KV reuse：把命中的 KV 接到后续 prefill / decode 里。</li>
+<li>insertion：请求处理完后，把新产生的 KV 插入缓存结构。</li>
+<li>eviction：GPU 显存有限，要决定淘汰哪些 KV。</li>
+<li>cache-aware scheduling：调度请求时考虑谁能共享缓存，减少缓存来回抖动。</li>
+</ul>
+<p>从第一性原理看，RadixAttention 的本质是：</p>
+<blockquote>
+<p>把 causal Transformer 的前缀不变性，转化成运行时的前缀索引结构。</p>
+</blockquote>
+<h2 id="15-hicache-gpu-kv">15. HiCache：当 GPU 放不下所有 KV</h2>
+<p>RadixAttention 解决的是“怎么索引和复用前缀 KV”。但还有一个现实问题：KV state 可能非常大，GPU 显存放不下所有缓存。</p>
+<p>长上下文、多用户、多轮会话会制造大量 KV。一个 coding agent 会话几轮之后可能超过数万 tokens。如果每个活跃会话都希望保留完整历史 KV，GPU-only cache 很快就会被挤满。缓存被淘汰后，下一轮又要重新 prefill，time to first token 又会变高。</p>
+<p>HiCache 解决的是分层存储问题。它把 KV cache 扩展成多层：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-17-1">1</a></span>
+<span class="normal"><a href="#__codelineno-17-2">2</a></span>
+<span class="normal"><a href="#__codelineno-17-3">3</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1"></a>L1: GPU memory
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2"></a>L2: host memory
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3"></a>L3: distributed storage
+</span></code></pre></div></td></tr></table></div>
+<p>可以把它想成浏览器缓存或操作系统缓存的思路：最快的地方容量最小，慢一点的地方容量更大。</p>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>优点</th>
+<th>代价</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GPU memory</td>
+<td>命中最快，最适合马上计算</td>
+<td>容量最贵、最小</td>
+</tr>
+<tr>
+<td>host memory</td>
+<td>容量更大</td>
+<td>需要 CPU-GPU 传输</td>
+</tr>
+<tr>
+<td>distributed storage</td>
+<td>可跨实例保存更多 KV</td>
+<td>I/O 延迟和带宽成本更高</td>
+</tr>
+</tbody>
+</table>
+<p>这正好对应前面的 <span class="arithmatex">\(T_{\mathrm{fetch}}(p)\)</span>。KV 放得越远，取回越慢；但如果完全不放远层，缓存容量又不够。</p>
+<p>所以 HiCache 的关键问题是：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-18-1">1</a></span>
+<span class="normal"><a href="#__codelineno-18-2">2</a></span>
+<span class="normal"><a href="#__codelineno-18-3">3</a></span>
+<span class="normal"><a href="#__codelineno-18-4">4</a></span>
+<span class="normal"><a href="#__codelineno-18-5">5</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1"></a>KV 放在哪里？
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2"></a>什么时候提前搬回来？
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3"></a>新 KV 什么时候写回慢层？
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4"></a>GPU 满了淘汰谁？
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5"></a>哪个请求更值得先调度？
+</span></code></pre></div></td></tr></table></div>
+<p>几个术语可以这样理解：</p>
+<ul>
+<li>HiRadixTree：不仅记录哪个 prefix 有缓存，还记录 KV page 在 GPU、CPU 还是远端。</li>
+<li>Prefetch：提前把可能用到的 KV 从慢层搬到快层。</li>
+<li>Write-back / write-through：决定新产生的 KV 什么时候写回 CPU 或远端。</li>
+<li>Eviction：容量不够时选择淘汰哪些 KV。</li>
+<li>Scheduling：优先安排更容易命中缓存、或者能更好隐藏 I/O 的请求。</li>
+</ul>
+<p>HiCache 的本质是：</p>
+<blockquote>
+<p>在更大的缓存容量和更低的取回延迟之间做工程平衡。</p>
+</blockquote>
+<h2 id="16">16. 什么会破坏缓存命中</h2>
+<p>下面这张表可以直接当成 Agent prompt 设计时的检查清单。</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>为什么会破坏或降低命中</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>在最前面插入当前时间</td>
+<td>时间每轮都变，第一个变化点太早，后面稳定内容也失去公共前缀。</td>
+</tr>
+<tr>
+<td>request id / trace id 放在 system 前</td>
+<td>id 每轮不同，会把整个后续 prompt 推到不同前缀之后。</td>
+</tr>
+<tr>
+<td>tool schema 顺序动态变化</td>
+<td>即使工具集合差不多，token 顺序变了，最长公共前缀会变短。</td>
+</tr>
+<tr>
+<td>每轮把 summary 写在很靠前的位置</td>
+<td>summary 一变，后面 history / tools / rules 都难以复用。</td>
+</tr>
+<tr>
+<td>tokenizer 变化</td>
+<td>同一段文本会被切成不同 token，旧 KV state 不适用。</td>
+</tr>
+<tr>
+<td>模型、LoRA、量化或 RoPE 配置变化</td>
+<td>内部计算路径变了，同样 token 也不保证产生同样 KV state。</td>
+</tr>
+<tr>
+<td>同一段文本出现在不同位置</td>
+<td>位置编号和前文不同，KV state 不是同一个。</td>
+</tr>
+<tr>
+<td>attention mask 或推理配置变化</td>
+<td>前缀 token 能看到的内容或计算方式变了，缓存不能直接复用。</td>
+</tr>
+</tbody>
+</table>
+<p>这张表背后的统一原则是：</p>
+<blockquote>
+<p>Prompt Cache 复用的是“相同位置上的相同 token，在相同模型配置下产生的相同 KV state”。</p>
+</blockquote>
+<h2 id="17-agent-prompt">17. 对 Agent prompt 设计的启发</h2>
+<p>如果希望推理引擎更容易复用前缀 KV，就要让相邻请求拥有更长的 LCP。</p>
+<p>一个 cache-friendly 的 prompt 结构通常是：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-19-1">1</a></span>
+<span class="normal"><a href="#__codelineno-19-2">2</a></span>
+<span class="normal"><a href="#__codelineno-19-3">3</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1"></a>[稳定前缀] system / tools / schema / project rules / fixed workflow
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2"></a>[逐步增长] history / previous tool calls / previous tool results
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3"></a>[动态后缀] current user / current tool result / temporary RAG / precise time
+</span></code></pre></div></td></tr></table></div>
+<p>稳定内容适合放前面：</p>
+<ul>
+<li>system prompt。</li>
+<li>tool schema。</li>
+<li>structured output schema。</li>
+<li>项目规则。</li>
+<li>固定 workflow。</li>
+<li>长期保持不变的 persona 或安全约束。</li>
+</ul>
+<p>动态内容适合放后面：</p>
+<ul>
+<li>当前用户输入。</li>
+<li>本轮 tool result。</li>
+<li>本轮 RAG 片段。</li>
+<li>精确时间戳。</li>
+<li>request id、trace id。</li>
+<li>临时状态。</li>
+</ul>
+<p>尤其要小心几类看似很短、但破坏力很强的内容：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-20-1">1</a></span>
+<span class="normal"><a href="#__codelineno-20-2">2</a></span>
+<span class="normal"><a href="#__codelineno-20-3">3</a></span>
+<span class="normal"><a href="#__codelineno-20-4">4</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1"></a>Current time: 2026-07-07 15:23:41
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2"></a>Request id: 8fa9...
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3"></a>Trace id: ...
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4"></a>Random seed: ...
+</span></code></pre></div></td></tr></table></div>
+<p>如果它们被插到最前面，即使只变化一个 token，也会让后面的所有稳定内容失去同一个 prefix。</p>
+<p>这不意味着动态内容不能出现。它们当然可以出现，只是要尽量放在后缀，让稳定内容先形成更长的公共前缀。</p>
+<p>实践原则可以概括为：</p>
+<blockquote>
+<p>Prompt 组织里的“稳定前缀 + 动态后缀”，本质是把 causal Transformer 的前缀不变性转化为推理系统里的缓存局部性。</p>
+</blockquote>
+<h2 id="18">18. 小结：整条推导链</h2>
+<p>全文可以概括为一条推导链：</p>
+<div class="language-text highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-21-1">1</a></span>
+<span class="normal"><a href="#__codelineno-21-2">2</a></span>
+<span class="normal"><a href="#__codelineno-21-3">3</a></span>
+<span class="normal"><a href="#__codelineno-21-4">4</a></span>
+<span class="normal"><a href="#__codelineno-21-5">5</a></span>
+<span class="normal"><a href="#__codelineno-21-6">6</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1"></a>deterministic computation
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2"></a>-&gt; token prefix identity
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3"></a>-&gt; causal prefix invariance
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4"></a>-&gt; KV state reuse
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5"></a>-&gt; reduced repeated prefill
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6"></a>-&gt; cache-friendly prompt layout
+</span></code></pre></div></td></tr></table></div>
+<p>对应到本文的推导：</p>
+<ol>
+<li>缓存成立，因为确定性计算在相同输入下有相同输出。</li>
+<li>LLM 的输入首先是 token 序列和位置，而不是原始字符串。</li>
+<li>causal mask 保证后缀不会反过来改变前缀状态。</li>
+<li>相同前缀产生相同 KV state，所以可以复用。</li>
+<li>复用 KV state 省掉重复 prefill，但模型仍然看完整上下文。</li>
+<li>Agent prompt 应该让稳定内容形成尽可能长的公共前缀。</li>
+</ol>
+<p>如果你能回答下面这些问题，就已经抓住了 Prompt Cache 的主线：</p>
+<ol>
+<li>Prompt Cache 缓存的是回答、文本，还是模型内部状态？</li>
+<li>为什么缓存的第一性原理是确定性函数？</li>
+<li>为什么两个请求必须有 token 级相同前缀，才能复用缓存？</li>
+<li>为什么后缀不会改变前缀已经算出的 KV state？</li>
+<li>Prompt Cache 省的是 prefill、decode，还是 RAG 检索？</li>
+<li>为什么时间戳放在 prompt 最前面会破坏缓存命中？</li>
+<li>为什么相同的 <code>tools</code> 文本出现在不同位置时，不能直接复用？</li>
+<li>RadixAttention 和 HiCache 分别解决什么工程问题？</li>
+</ol>
+<p>最后回到核心结论：</p>
+<blockquote>
+<p>Prompt Cache 复用的不是语义相似性，也不是最终回答，而是 causal Transformer 中相同 token 前缀产生的 KV state。它让推理系统少做重复 prefill，同时仍然让模型基于完整上下文生成。</p>
+</blockquote>
+<h2 id="_1">参考资料</h2>
+<h3 id="_2">入门背景</h3>
+<ul>
+<li><a href="https://arxiv.org/abs/1706.03762">Attention Is All You Need</a>：Transformer、scaled dot-product attention、causal mask 的基础。</li>
+<li><a href="https://huggingface.co/docs/transformers/en/cache_explanation">Hugging Face Transformers: Caching</a>：KV cache 在推理阶段如何存储和复用。</li>
+</ul>
+<h3 id="_3">推理系统</h3>
+<ul>
+<li><a href="https://arxiv.org/abs/2311.04934">Prompt Cache: Modular Attention Reuse for Low-Latency Inference</a>：作为相关工作参考，重点看 Background/Related Work 中对 attention state reuse 问题的定义。</li>
+<li><a href="https://api-docs.deepseek.com/zh-cn/quick_start/pricing">DeepSeek API 模型价格</a>：作为现实计费例子，展示 cached input 和 uncached input 的价格差异。</li>
+</ul>
+<h3 id="sglang-hicache">推理引擎 / SGLang / HiCache</h3>
+<ul>
+<li><a href="https://docs.vllm.ai/">vLLM Documentation</a>：vLLM 作为 LLM inference and serving 引擎的官方文档，包含 PagedAttention、continuous batching、prefix caching 等推理系统能力。</li>
+<li><a href="https://arxiv.org/abs/2312.07104">SGLang: Efficient Execution of Structured Language Model Programs</a>：RadixAttention、LM Program、跨请求 KV cache 复用。</li>
+<li><a href="https://www.lmsys.org/blog/2024-01-17-sglang/">Fast and Expressive LLM Inference with RadixAttention and SGLang</a>：SGLang 官方博客，对 RadixAttention 的工程解释更直观。</li>
+<li><a href="https://docs.sglang.io/docs/advanced_features/hicache_design">SGLang HiCache System Design and Optimization</a>：HiCache 架构、HiRadixTree、prefetch、write-back、L1/L2/L3。</li>
+<li><a href="https://docs.sglang.io/docs/advanced_features/hicache_best_practices">SGLang HiCache Best Practices</a>：HiCache 配置、page layout、storage backend 实践。</li>
+<li><a href="https://www.lmsys.org/blog/2025-09-10-sglang-hicache/">SGLang HiCache: Fast Hierarchical KV Caching with Your Favorite Storage Backends</a>：HiCache 场景、社区案例和 benchmark。</li>
+</ul>
+<h3 id="agent">Agent 实践</h3>
+<ul>
+<li><a href="https://code.claude.com/docs/en/prompt-caching">How Claude Code uses prompt caching</a>：Agent 场景下 prefix matching、缓存失效和上下文分层的工程说明。</li>
+<li><a href="https://developers.openai.com/api/docs/guides/code-generation">OpenAI Code generation / Codex</a>：Codex 作为 coding agent 场景材料。</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../irl-rlhf-rlvr-reward-source/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 从 IRL 到 RLHF，再到 RLVR：LLM 后训练到底在学什么奖励？">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                从 IRL 到 RLHF，再到 RLVR：LLM 后训练到底在学什么奖励？
+              </div>
+            </div>
+          </a>
+        
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy", "navigation.footer", "navigation.tabs", "search.suggest", "search.share"], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.92b07e13.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="../../assets/javascripts/comments.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
