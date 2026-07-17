@@ -1,3 +1,9 @@
+---
+hide:
+  - navigation
+  - toc
+---
+
 # LLM Agent Lab
 
 这里收集 AI、LLM、Agent 系统与后训练实践相关的文章和实验笔记。
