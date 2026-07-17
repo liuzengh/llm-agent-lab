@@ -6,6 +6,11 @@
     line-height: 1.75;
 }
 
+/* Keep the article list readable; the page TOC remains in the right sidebar. */
+.md-sidebar--primary .md-nav--secondary {
+    display: none;
+}
+
 .article-meta {
     color: var(--md-default-fg-color--light);
     font-size: 0.78rem;
