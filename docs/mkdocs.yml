@@ -9,8 +9,9 @@ docs_dir: mkdocs/
 nav:
   - 首页: index.md
   - Blog:
-      - 从 IRL 到 RLHF，再到 RLVR：LLM 后训练到底在学什么奖励？: blog/irl-rlhf-rlvr-reward-source.md
+      - 文章列表: blog/index.md
       - Prompt Cache 的价值与原理：少算重复前缀，降低成本和延迟: blog/prompt-cache-value-and-principles.md
+      - 从 IRL 到 RLHF，再到 RLVR：LLM 后训练到底在学什么奖励？: blog/irl-rlhf-rlvr-reward-source.md
 
 plugins:
   - search
@@ -51,12 +52,15 @@ markdown_extensions:
       custom_fences:
         - name: mermaid
           class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - mdx_truly_sane_lists
 
 extra_css:
   - assets/stylesheets/extra.css
 
 extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mermaid@10.9.3/dist/mermaid.min.js
+  - assets/javascripts/mermaid.js
   - assets/javascripts/mathjax.js
   - assets/javascripts/comments.js
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js

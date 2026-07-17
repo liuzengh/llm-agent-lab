@@ -1,4 +1,11 @@
+---
+date: 2026-07-02
+description: 用 reward source 串起 IRL、RLHF、DPO、RLVR 和 PRM，区分 learned reward 与 verifiable reward。
+---
+
 # 从 IRL 到 RLHF，再到 RLVR：LLM 后训练到底在学什么奖励？
+
+<p class="article-meta">发布于 2026-07-02</p>
 
 > The reward is not the point; the point is where the reward points.
 
@@ -13,6 +20,28 @@
 如果 reward 已经可以被明确写出来，RL 要解决的是如何在这个 reward 下优化 policy。如果 reward 写不出来，只能从人类行为、偏好或专家示范中反推，那么问题就带有 Inverse Reinforcement Learning（IRL）的味道。这个视角能把传统 RL、IRL、RLHF、DPO，以及 reasoning / thinking 模型中的 RLVR 放到同一张图里。
 
 这是一条很值得抓住的线索：LLM RL 并不是凭空出现的新范式，它延续了经典 RL 里“reward 如何获得”的老问题，只是这个问题在语言模型里变得更抽象，也更重要。
+
+```mermaid
+flowchart TD
+    A["LLM post-training<br/>调整模型行为分布"]
+    B{"Reward 从哪里来？"}
+    C["Reward unknown<br/>从偏好或行为中学习"]
+    D["Reward known<br/>由规则、测试或环境验证"]
+    E["Learned reward<br/>IRL / RLHF / RLAIF / DPO / PRM"]
+    F["Verifiable reward<br/>RLVR / rule-based RL / code tests"]
+    G["先学习 reward<br/>再优化 policy"]
+    H["直接对 checker<br/>优化 policy"]
+
+    A --> B
+    B --> C
+    B --> D
+    C --> E
+    D --> F
+    E --> G
+    F --> H
+```
+
+_图：后训练方法可以先按 reward 来源分成 learned reward 和 verifiable reward，再讨论具体优化方法。_
 
 ## 1. 先看 LLM 的整体训练链路
 

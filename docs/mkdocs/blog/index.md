@@ -1,17 +1,9 @@
-# LLM Agent Lab
+# Blog
 
-这里收集 AI、LLM、Agent 系统与后训练实践相关的文章和实验笔记。
-
-关注主题包括：
-
-- LLM 后训练、RLHF、RLVR、偏好学习与奖励建模
-- Agent runtime、工具调用、记忆、规划、评估与可观测
-- 构建可靠 AI 应用的工程实践
-
-## 最新文章
+这里按发布时间倒序整理 LLM Agent Lab 的文章。
 
 <div class="article-list">
-  <a class="article-card" href="blog/prompt-cache-value-and-principles/">
+  <a class="article-card" href="prompt-cache-value-and-principles/">
     <span class="article-card__keywords" aria-label="文章关键词">
       <span class="article-card__keywords-title">关键词</span>
       <span class="article-card__keyword-list">
@@ -27,7 +19,7 @@
       <span class="article-card__title">Prompt Cache 的价值与原理：少算重复前缀，降低成本和延迟</span>
     </span>
   </a>
-  <a class="article-card" href="blog/irl-rlhf-rlvr-reward-source/">
+  <a class="article-card" href="irl-rlhf-rlvr-reward-source/">
     <span class="article-card__keywords" aria-label="文章关键词">
       <span class="article-card__keywords-title">关键词</span>
       <span class="article-card__keyword-list">
@@ -45,5 +37,3 @@
     </span>
   </a>
 </div>
-
-[查看全部文章](blog/index.md)

@@ -9,8 +9,8 @@
     categoryId: "DIC_kwDOTLe_Vc4DAZbP",
   };
 
-  function isBlogPage() {
-    return window.location.pathname.indexOf("/blog/") !== -1;
+  function isBlogArticlePage() {
+    return /\/blog\/[^/]+\/?$/.test(window.location.pathname);
   }
 
   function getGiscusTheme() {
@@ -72,7 +72,7 @@
     var article = document.querySelector(".md-content__inner");
     var existing = document.getElementById(COMMENT_SECTION_ID);
 
-    if (!isBlogPage()) {
+    if (!isBlogArticlePage()) {
       removeComments();
       return;
     }

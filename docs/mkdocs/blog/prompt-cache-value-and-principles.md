@@ -1,10 +1,35 @@
+---
+date: 2026-07-07
+description: 从 token、position、KV Cache 和最长公共前缀出发，解释 Prompt Cache 为什么能降低成本和延迟。
+---
+
 # Prompt Cache 的价值与原理：少算重复前缀，降低成本和延迟
+
+<p class="article-meta">发布于 2026-07-07</p>
 
 > 缓存不是让模型少看上下文，而是让推理系统少做重复的前缀计算。
 
 Agent 时代的 LLM 请求越来越长：system prompt、工具定义、项目规则、历史消息、tool result、文件片段和命令输出会在多轮请求之间反复出现。Prompt Cache 要回答的问题是：既然前面大段 token 完全相同，推理系统能不能复用已经算过的内部状态，而不是每轮都重新 prefill？
 
 本文先说明 Prompt Cache 的现实价值：它如何降低 token 计费成本和请求延迟。随后再从缓存成立的基本条件出发，依次定义 token、position、prefix、suffix 和 LCP，推导自回归生成、attention、KV Cache、前缀不变性和成本模型，最后说明推理引擎如何把这个性质工程化。vLLM 和 SGLang 都是代表性的 LLM 推理引擎，本文后半部分以 SGLang 的 RadixAttention 和 HiCache 为例。
+
+```mermaid
+flowchart LR
+    R1["Request 1<br/>stable prefix + user 1 + answer 1"]
+    R2["Request 2<br/>same prefix + new suffix"]
+    P["Longest common prefix<br/>token 和 position 都相同"]
+    K["KV cache<br/>复用 prefix state"]
+    S["Extend<br/>只计算新增 suffix"]
+    C["Full context<br/>模型仍看到完整上下文"]
+
+    R1 --> P
+    R2 --> P
+    P --> K
+    K --> S
+    S --> C
+```
+
+_图：相同 token 前缀命中缓存后，推理系统复用已有 KV state，只计算新增 suffix。_
 
 ## 1. Prompt Cache 的价值：成本下降和延迟下降
 
