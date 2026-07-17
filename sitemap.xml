@@ -2,14 +2,18 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://liuzengh.github.io/llm-agent-lab/</loc>
-         <lastmod>2026-07-07</lastmod>
+         <lastmod>2026-07-17</lastmod>
+    </url>
+    <url>
+         <loc>https://liuzengh.github.io/llm-agent-lab/blog/</loc>
+         <lastmod>2026-07-17</lastmod>
     </url>
     <url>
          <loc>https://liuzengh.github.io/llm-agent-lab/blog/irl-rlhf-rlvr-reward-source/</loc>
-         <lastmod>2026-07-07</lastmod>
+         <lastmod>2026-07-17</lastmod>
     </url>
     <url>
          <loc>https://liuzengh.github.io/llm-agent-lab/blog/prompt-cache-value-and-principles/</loc>
-         <lastmod>2026-07-07</lastmod>
+         <lastmod>2026-07-17</lastmod>
     </url>
 </urlset>
