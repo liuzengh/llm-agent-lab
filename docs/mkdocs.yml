@@ -10,6 +10,7 @@ nav:
   - 首页: index.md
   - Blog:
       - 文章列表: blog/index.md
+      - Dynamic Workflow 的 Runtime 视角：把模型计划变成受控程序: blog/why-agents-need-dynamic-workflows.md
       - Prompt Cache 的价值与原理：少算重复前缀，降低成本和延迟: blog/prompt-cache-value-and-principles.md
       - 从 IRL 到 RLHF，再到 RLVR：LLM 后训练到底在学什么奖励？: blog/irl-rlhf-rlvr-reward-source.md
 

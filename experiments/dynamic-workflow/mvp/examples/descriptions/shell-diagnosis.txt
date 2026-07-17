@@ -1,0 +1,1 @@
+Diagnose this project's local build health. Use workspace.read for package metadata and shell.exec only for allowlisted, non-mutating version, build, and test commands. Report each command, exit status, concise evidence, and the smallest likely next fix. Do not write files.

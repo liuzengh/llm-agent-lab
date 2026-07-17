@@ -1,0 +1,1 @@
+Use the mcp.echo capability to call its allowlisted echo tool with the text "dynamic-workflow-ok". Return the exact MCP result and the capability ID used. Do not use any unavailable MCP tool.

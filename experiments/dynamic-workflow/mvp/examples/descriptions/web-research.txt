@@ -1,0 +1,1 @@
+Research the current official documentation for the OpenAI Agents SDK and the Model Context Protocol. Use web.search to discover authoritative pages and web.fetch to read only allowlisted sources. Run independent source collection in parallel, then synthesize the common integration pattern and cite every URL used.

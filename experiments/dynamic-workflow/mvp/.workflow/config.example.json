@@ -1,0 +1,20 @@
+{
+  "workspaceRoot": "../..",
+  "enableWorkspaceWrite": false,
+  "shellCommands": ["git", "node", "npm", "rg"],
+  "webDomains": ["example.com"],
+  "webSearch": {
+    "url": "https://search-adapter.example.com/search",
+    "apiKeyEnv": "WORKFLOW_WEB_SEARCH_API_KEY"
+  },
+  "mcpServers": [
+    {
+      "id": "echo",
+      "transport": "stdio",
+      "command": "node",
+      "args": ["examples/mcp/echo-server.mjs"],
+      "allowedTools": ["echo"],
+      "risk": "read"
+    }
+  ]
+}

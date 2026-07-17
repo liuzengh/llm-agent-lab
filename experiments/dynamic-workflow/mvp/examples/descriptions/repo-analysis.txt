@@ -1,0 +1,1 @@
+Study this repository as a new maintainer. Use workspace.read to identify the architecture, important entry points, test strategy, and three concrete maintenance risks. Parallelize independent architecture and test investigations, then synthesize one concise onboarding report with file-path evidence.

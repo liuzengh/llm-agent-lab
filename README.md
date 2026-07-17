@@ -8,7 +8,7 @@ It collects long-form notes, engineering write-ups, and runnable experiments aro
 - Agent runtime design, tool use, memory, planning, evaluation, and observability.
 - Practical engineering patterns for building reliable AI applications.
 
-The site is built with MkDocs Material and keeps the content structure intentionally small: configuration, articles, assets, and deployment workflow.
+The site is built with MkDocs Material. Runnable prototypes that accompany articles live under `experiments/`.
 
 ## Structure
 
@@ -20,6 +20,8 @@ The site is built with MkDocs Material and keeps the content structure intention
 │       ├── index.md            # Site home page
 │       ├── blog/               # Articles
 │       └── assets/             # CSS, JavaScript, and Python requirements
+├── experiments/
+│   └── dynamic-workflow/        # Runtime prototype for generated workflows
 └── .github/workflows/deploy.yml # GitHub Pages deployment workflow
 ```
 

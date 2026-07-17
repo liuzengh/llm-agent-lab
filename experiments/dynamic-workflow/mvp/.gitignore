@@ -1,0 +1,7 @@
+.env
+node_modules/
+.workflow/config.json
+.workflow/runs/
+.workflow/tmp/
+dist/
+coverage/
